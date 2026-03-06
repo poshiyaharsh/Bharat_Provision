@@ -1,34 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/localization/app_strings.dart';
+import '../../core/widgets/primary_button.dart';
 import '../../data/models/customer.dart';
 import '../../data/providers.dart';
+import 'khata_providers.dart';
 
 class CustomerEditScreen extends ConsumerStatefulWidget {
-  const CustomerEditScreen({super.key, this.existing});
+  const CustomerEditScreen({super.key, this.customerId});
 
-  final Customer? existing;
+  final int? customerId;
 
   @override
   ConsumerState<CustomerEditScreen> createState() => _CustomerEditScreenState();
 }
 
 class _CustomerEditScreenState extends ConsumerState<CustomerEditScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _noteController = TextEditingController();
 
+  bool _loading = true;
+  Customer? _customer;
+
   @override
   void initState() {
     super.initState();
-    final e = widget.existing;
-    if (e != null) {
-      _nameController.text = e.name;
-      _phoneController.text = e.phone ?? '';
-      _addressController.text = e.address ?? '';
-      _noteController.text = e.note ?? '';
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    if (widget.customerId == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    final repo = await ref.read(customerRepositoryFutureProvider.future);
+    final customer = await repo.getById(widget.customerId!);
+    if (customer != null && mounted) {
+      setState(() {
+        _customer = customer;
+        _nameController.text = customer.name;
+        _phoneController.text = customer.phone ?? '';
+        _addressController.text = customer.address ?? '';
+        _noteController.text = customer.note ?? '';
+        _loading = false;
+      });
+    } else {
+      setState(() => _loading = false);
     }
   }
 
@@ -42,138 +62,104 @@ class _CustomerEditScreenState extends ConsumerState<CustomerEditScreen> {
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final repo = ref.read(customerRepositoryProvider);
-    final customer = Customer(
-      id: widget.existing?.id,
-      name: _nameController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim(),
-      address: _addressController.text.trim().isEmpty
-          ? null
-          : _addressController.text.trim(),
-      note:
-          _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
-    );
-
-    try {
-      if (widget.existing == null) {
-        await repo.insert(customer);
-      } else {
-        await repo.update(customer);
-      }
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ભૂલ: $e')),
+        const SnackBar(content: Text(AppStrings.fieldRequired)),
       );
+      return;
     }
-  }
 
-  Future<void> _confirmDelete() async {
-    if (widget.existing?.id == null) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ગ્રાહક કાઢી નાખો'),
-        content: const Text(
-          'શું તમે ખરેખર આ ગ્રાહક કાઢી નાખવા માંગો છો? ખાતાનો ઇતિહાસ પણ જાય છે.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('રદ કરો'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('કાઢી નાખો'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true) return;
+    final repo = await ref.read(customerRepositoryFutureProvider.future);
+
     try {
-      await ref.read(customerRepositoryProvider).delete(widget.existing!.id!);
-      if (mounted) Navigator.of(context).pop(true);
+      if (_customer != null) {
+        await repo.update(_customer!.copyWith(
+          name: name,
+          phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+          note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        ));
+      } else {
+        await repo.insert(Customer(
+          name: name,
+          phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+          address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+          note: _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
+        ));
+      }
+      ref.invalidate(customerListProvider);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ગ્રાહક સફળતાપૂર્વક સેવ થયું')),
+        );
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('કાઢવામાં ભૂલ: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.errorGeneric} $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.existing == null ? 'નવો ગ્રાહક' : 'ગ્રાહક સંપાદન',
+          widget.customerId != null ? AppStrings.editCustomer : AppStrings.addCustomer,
         ),
-        actions: [
-          if (widget.existing != null)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _confirmDelete,
-            ),
-        ],
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'નામ',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'નામ જરૂરી છે' : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: AppStrings.customerName,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'ફોન',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: AppStrings.phone,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(
-                  labelText: 'સરનામું',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(
+                labelText: AppStrings.address,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _noteController,
-                decoration: const InputDecoration(
-                  labelText: 'નોંધ',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _noteController,
+              decoration: const InputDecoration(
+                labelText: AppStrings.note,
               ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _save,
-                  child: const Text('સાચવો'),
-                ),
-              ),
-            ],
-          ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 24),
+            PrimaryButton(
+              label: AppStrings.saveButton,
+              icon: Icons.save,
+              onPressed: _save,
+            ),
+          ],
         ),
       ),
     );

@@ -1,24 +1,17 @@
-class SettingEntry {
-  SettingEntry({
-    required this.key,
-    required this.value,
-  });
-
+class Setting {
   final String key;
   final String value;
 
-  factory SettingEntry.fromMap(Map<String, Object?> map) {
-    return SettingEntry(
+  const Setting({required this.key, required this.value});
+
+  factory Setting.fromMap(Map<String, dynamic> map) {
+    return Setting(
       key: map['key'] as String,
-      value: map['value'] as String,
+      value: map['value'] as String? ?? '',
     );
   }
 
   Map<String, Object?> toMap() {
-    return {
-      'key': key,
-      'value': value,
-    };
+    return {'key': key, 'value': value};
   }
 }
-

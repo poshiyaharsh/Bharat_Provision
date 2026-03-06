@@ -1,36 +1,37 @@
-class AppUser {
-  AppUser({
-    this.id,
-    required this.name,
-    this.pin,
-    required this.role,
-    this.isActive = true,
-  });
-
+class User {
   final int? id;
   final String name;
-  final String? pin;
-  final String role; // 'owner' or 'staff'
+  final String pin;
+  final String role; // 'owner' | 'staff'
   final bool isActive;
 
-  factory AppUser.fromMap(Map<String, Object?> map) {
-    return AppUser(
+  const User({
+    this.id,
+    required this.name,
+    required this.pin,
+    required this.role,
+    required this.isActive,
+  });
+
+  factory User.fromMap(Map<String, dynamic> map) {
+    return User(
       id: map['id'] as int?,
       name: map['name'] as String,
-      pin: map['pin'] as String?,
-      role: map['role'] as String,
-      isActive: (map['is_active'] as int) == 1,
+      pin: map['pin'] as String? ?? '',
+      role: map['role'] as String? ?? 'staff',
+      isActive: (map['is_active'] as int? ?? 1) == 1,
     );
   }
 
   Map<String, Object?> toMap() {
     return {
-      'id': id,
+      if (id != null) 'id': id,
       'name': name,
       'pin': pin,
       'role': role,
       'is_active': isActive ? 1 : 0,
     };
   }
-}
 
+  bool get isOwner => role == 'owner';
+}

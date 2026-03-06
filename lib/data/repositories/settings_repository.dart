@@ -1,36 +1,42 @@
 import 'package:sqflite/sqflite.dart';
 
-import '../db/app_database.dart';
-import '../models/setting.dart';
-
 class SettingsRepository {
-  Future<Database> get _db async => AppDatabase.database;
+  SettingsRepository(this._db);
 
-  Future<SettingEntry?> getByKey(String key) async {
-    final db = await _db;
-    final rows = await db.query(
+  final Database _db;
+
+  Future<String?> get(String key) async {
+    final result = await _db.query(
       'settings',
+      columns: ['value'],
       where: 'key = ?',
       whereArgs: [key],
-      limit: 1,
     );
-    if (rows.isEmpty) return null;
-    return SettingEntry.fromMap(rows.first);
+    if (result.isEmpty) return null;
+    return result.first['value'] as String?;
   }
 
-  Future<void> setValue(String key, String value) async {
-    final db = await _db;
-    await db.insert(
+  Future<void> set(String key, String value) async {
+    await _db.insert(
       'settings',
       {'key': key, 'value': value},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<List<SettingEntry>> getAll() async {
-    final db = await _db;
-    final rows = await db.query('settings');
-    return rows.map(SettingEntry.fromMap).toList();
+  Future<bool> getBool(String key, {bool defaultValue = false}) async {
+    final v = await get(key);
+    if (v == null) return defaultValue;
+    return v.toLowerCase() == 'true' || v == '1';
+  }
+
+  Future<void> setBool(String key, bool value) async {
+    await set(key, value.toString());
+  }
+
+  Future<int> getInt(String key, {int defaultValue = 0}) async {
+    final v = await get(key);
+    if (v == null) return defaultValue;
+    return int.tryParse(v) ?? defaultValue;
   }
 }
-

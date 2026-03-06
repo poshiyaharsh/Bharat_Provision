@@ -1,57 +1,50 @@
 import 'package:sqflite/sqflite.dart';
 
-import '../db/app_database.dart';
 import '../models/customer.dart';
 
 class CustomerRepository {
-  Future<Database> get _db async => AppDatabase.database;
+  CustomerRepository(this._db);
 
-  Future<List<Customer>> getAll({String? searchQuery}) async {
-    final db = await _db;
-    final where = <String>[];
-    final args = <Object?>[];
+  final Database _db;
 
-    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      where.add('name LIKE ?');
-      args.add('%$searchQuery%');
-    }
-
-    final rows = await db.query(
-      'customers',
-      where: where.isEmpty ? null : where.join(' AND '),
-      whereArgs: where.isEmpty ? null : args,
-      orderBy: 'name COLLATE NOCASE',
-    );
-
-    return rows.map(Customer.fromMap).toList();
+  Future<List<Customer>> getAll() async {
+    final maps = await _db.query('customers', orderBy: 'name ASC');
+    return maps.map((m) => Customer.fromMap(m)).toList();
   }
 
-  Future<Customer> insert(Customer customer) async {
-    final db = await _db;
-    final id = await db.insert('customers', customer.toMap()..remove('id'));
-    return Customer(
-      id: id,
-      name: customer.name,
-      phone: customer.phone,
-      address: customer.address,
-      note: customer.note,
+  Future<List<Customer>> search(String query) async {
+    if (query.trim().isEmpty) return getAll();
+    final q = '%${query.trim()}%';
+    final maps = await _db.query(
+      'customers',
+      where: 'name LIKE ? OR phone LIKE ?',
+      whereArgs: [q, q],
+      orderBy: 'name ASC',
     );
+    return maps.map((m) => Customer.fromMap(m)).toList();
   }
 
-  Future<void> update(Customer customer) async {
-    final db = await _db;
-    await db.update(
+  Future<Customer?> getById(int id) async {
+    final maps = await _db.query('customers', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) return null;
+    return Customer.fromMap(maps.first);
+  }
+
+  Future<int> insert(Customer c) async {
+    return _db.insert('customers', c.toMap());
+  }
+
+  Future<int> update(Customer c) async {
+    if (c.id == null) return 0;
+    return _db.update(
       'customers',
-      customer.toMap()..remove('id'),
+      c.toMap(),
       where: 'id = ?',
-      whereArgs: [customer.id],
+      whereArgs: [c.id],
     );
   }
 
-  Future<void> delete(int id) async {
-    final db = await _db;
-    await db.delete('khata_entries', where: 'customer_id = ?', whereArgs: [id]);
-    await db.delete('customers', where: 'id = ?', whereArgs: [id]);
+  Future<int> delete(int id) async {
+    return _db.delete('customers', where: 'id = ?', whereArgs: [id]);
   }
 }
-

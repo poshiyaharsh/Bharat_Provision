@@ -1,72 +1,85 @@
 import 'package:sqflite/sqflite.dart';
 
-import '../db/app_database.dart';
 import '../models/khata_entry.dart';
 
 class KhataRepository {
-  Future<Database> get _db async => AppDatabase.database;
+  KhataRepository(this._db);
 
-  Future<List<KhataEntry>> getEntriesForCustomer(int customerId) async {
-    final db = await _db;
-    final rows = await db.query(
-      'khata_entries',
-      where: 'customer_id = ?',
-      whereArgs: [customerId],
-      orderBy: 'date_time ASC, id ASC',
-    );
-    return rows.map(KhataEntry.fromMap).toList();
-  }
+  final Database _db;
 
-  Future<double> getCurrentBalance(int customerId) async {
-    final db = await _db;
-    final rows = await db.rawQuery(
+  Future<double> getBalance(int customerId) async {
+    final result = await _db.rawQuery(
       '''
-      SELECT balance_after
-      FROM khata_entries
+      SELECT balance_after FROM khata_entries
       WHERE customer_id = ?
       ORDER BY date_time DESC, id DESC
       LIMIT 1
       ''',
       [customerId],
     );
-    if (rows.isEmpty) return 0;
-    return (rows.first['balance_after'] as num).toDouble();
+    if (result.isEmpty) return 0;
+    return (result.first['balance_after'] as num?)?.toDouble() ?? 0;
   }
 
-  Future<KhataEntry> addEntry(KhataEntry entry) async {
-    final db = await _db;
+  Future<List<KhataEntry>> getEntries(int customerId, {int? limit}) async {
+    var sql = '''
+      SELECT * FROM khata_entries
+      WHERE customer_id = ?
+      ORDER BY date_time DESC, id DESC
+    ''';
+    if (limit != null) sql += ' LIMIT $limit';
 
-    return db.transaction((txn) async {
-      final previousRows = await txn.rawQuery(
-        '''
-        SELECT balance_after
-        FROM khata_entries
-        WHERE customer_id = ?
-        ORDER BY date_time DESC, id DESC
-        LIMIT 1
-        ''',
-        [entry.customerId],
-      );
+    final maps = await _db.rawQuery(sql, [customerId]);
+    return maps.map((m) => KhataEntry.fromMap(m)).toList();
+  }
 
-      final previousBalance = previousRows.isEmpty
-          ? 0.0
-          : (previousRows.first['balance_after'] as num).toDouble();
+  Future<void> addEntry({
+    required int customerId,
+    required String type,
+    required double amount,
+    int? relatedBillId,
+    String? note,
+  }) async {
+    await _db.transaction((txn) async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final currentBalance = await _getBalance(txn, customerId);
+      final newBalance = type == 'debit'
+          ? currentBalance + amount
+          : currentBalance - amount;
 
-      final delta = entry.type == 'debit' ? entry.amount : -entry.amount;
-      final newBalance = previousBalance + delta;
-
-      final toInsert = entry.copyWith(balanceAfter: newBalance);
-      final id = await txn.insert('khata_entries', toInsert.toMap()..remove('id'));
-
-      final insertedRow = await txn.query(
-        'khata_entries',
-        where: 'id = ?',
-        whereArgs: [id],
-        limit: 1,
-      );
-
-      return KhataEntry.fromMap(insertedRow.first);
+      await txn.insert('khata_entries', {
+        'customer_id': customerId,
+        'related_bill_id': relatedBillId,
+        'date_time': now,
+        'type': type,
+        'amount': amount,
+        'note': note,
+        'balance_after': newBalance,
+      });
     });
   }
-}
 
+  Future<double> _getBalance(Transaction txn, int customerId) async {
+    final result = await txn.rawQuery(
+      '''
+      SELECT balance_after FROM khata_entries
+      WHERE customer_id = ?
+      ORDER BY date_time DESC, id DESC
+      LIMIT 1
+      ''',
+      [customerId],
+    );
+    if (result.isEmpty) return 0;
+    return (result.first['balance_after'] as num?)?.toDouble() ?? 0;
+  }
+
+  Future<void> addUdharFromBill(int customerId, int billId, double amount) async {
+    await addEntry(
+      customerId: customerId,
+      type: 'debit',
+      amount: amount,
+      relatedBillId: billId,
+      note: 'બીલથી ઉધાર',
+    );
+  }
+}

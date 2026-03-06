@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_strings.dart';
-import '../../core/utils/formatters.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/currency_format.dart';
+import '../../core/widgets/confirm_dialog.dart';
+import '../../data/models/customer.dart';
 import '../../data/providers.dart';
-import 'customer_edit_screen.dart';
-import 'customer_khata_detail_screen.dart';
+import '../../routing/app_router.dart';
+import 'khata_providers.dart';
 
 class CustomerListScreen extends ConsumerStatefulWidget {
   const CustomerListScreen({super.key});
@@ -15,85 +18,194 @@ class CustomerListScreen extends ConsumerStatefulWidget {
 }
 
 class _CustomerListScreenState extends ConsumerState<CustomerListScreen> {
+  final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      ref.read(customerSearchProvider.notifier).state = _searchController.text;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Color _balanceColor(double balance) {
+    if (balance > 0) return AppColors.alert;
+    if (balance < 0) return AppColors.success;
+    return AppColors.warning;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final asyncCustomers = ref.watch(customersWithBalanceProvider);
+    final customersAsync = ref.watch(customerListProvider);
 
-    return Column(
-      children: [
-        Expanded(
-          child: asyncCustomers.when(
-            data: (list) {
-              if (list.isEmpty) {
-                return const Center(
-                  child: Text('અહીં હજુ કોઈ ગ્રાહક ઉમેરાયેલ નથી.'),
-                );
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.all(8),
-                itemCount: list.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = list[index];
-                  final balance = item.balance;
-                  final color = balance <= 0
-                      ? Colors.green
-                      : (balance > 500 ? Colors.red : Colors.orange);
-                  return ListTile(
-                    leading: Icon(
-                      Icons.person,
-                      color: color,
-                    ),
-                    title: Text(item.customer.name),
-                    subtitle: Text(
-                      'બાકી: ${Formatters.formatCurrency(balance)}',
-                      style: TextStyle(
-                        color: color,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CustomerKhataDetailScreen(
-                            customer: item.customer,
-                          ),
-                        ),
-                      );
-                      if (mounted) setState(() {});
-                    },
-                  );
-                },
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('ભૂલ: $e')),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                final created = await Navigator.of(context).push<bool>(
-                  MaterialPageRoute(
-                    builder: (_) => const CustomerEditScreen(),
-                  ),
-                );
-                if (created == true && mounted) {
-                  ref.invalidate(customersWithBalanceProvider);
-                  setState(() {});
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('નવો ગ્રાહક'),
+    return Scaffold(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '${AppStrings.customerName} અથવા ${AppStrings.phone} શોધો',
+                prefixIcon: const Icon(Icons.search),
+              ),
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: customersAsync.when(
+              data: (customers) => _CustomerListWithBalances(
+                customers: customers,
+                balanceColor: _balanceColor,
+                onCustomerTap: (c) => Navigator.of(context).pushNamed(
+                  AppRouter.customerKhata,
+                  arguments: c.id,
+                ),
+                onDelete: (_, c) => _confirmDelete(c),
+              ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('${AppStrings.errorGeneric} $e')),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).pushNamed(AppRouter.customerAdd),
+        icon: const Icon(Icons.add),
+        label: const Text(AppStrings.addCustomer),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(Customer customer) async {
+    final ok = await ConfirmDialog.show(
+      context,
+      title: AppStrings.deleteCustomerTitle,
+      message: AppStrings.deleteCustomerMessage,
+    );
+    if (ok != true || !mounted) return;
+
+    String message;
+    try {
+      final repo = await ref.read(customerRepositoryFutureProvider.future);
+      await repo.delete(customer.id!);
+      ref.invalidate(customerListProvider);
+      message = 'ગ્રાહક સફળતાપૂર્વક કાઢી નાખ્યું';
+    } catch (e) {
+      message = '${AppStrings.errorGeneric} $e';
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _CustomerListWithBalances extends ConsumerWidget {
+  const _CustomerListWithBalances({
+    required this.customers,
+    required this.balanceColor,
+    required this.onCustomerTap,
+    required this.onDelete,
+  });
+
+  final List<Customer> customers;
+  final Color Function(double) balanceColor;
+  final void Function(Customer) onCustomerTap;
+  final void Function(BuildContext, Customer) onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (customers.isEmpty) {
+      return Center(child: Text(AppStrings.noCustomersFound));
+    }
+
+    return ListView.builder(
+      itemCount: customers.length,
+      itemBuilder: (ctx, i) {
+        final c = customers[i];
+        return FutureBuilder(
+          future: ref.read(khataRepositoryFutureProvider.future).then(
+                (repo) => repo.getBalance(c.id!),
+              ),
+          builder: (ctx, snap) {
+            final balance = snap.data ?? 0.0;
+            return Card(
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: balanceColor(balance),
+                  child: const Icon(Icons.person, color: Colors.white),
+                ),
+                title: Text(c.name),
+                subtitle: Text(c.phone ?? ''),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      formatCurrency(balance),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: balanceColor(balance),
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      onSelected: (v) {
+                        if (v == 'khata') {
+                          onCustomerTap(c);
+                        } else if (v == 'edit') {
+                          Navigator.of(context).pushNamed(
+                            AppRouter.customerEdit,
+                            arguments: c.id,
+                          );
+                        } else if (v == 'delete') {
+                          onDelete(context, c);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'khata',
+                          child: Row(
+                            children: [
+                              Icon(Icons.assignment),
+                              SizedBox(width: 8),
+                              Text('ખાતા જુઓ'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit),
+                              SizedBox(width: 8),
+                              Text('બદલો'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('કાઢી નાખો'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                onTap: () => onCustomerTap(c),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

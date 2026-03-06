@@ -1,130 +1,231 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/localization/app_strings.dart';
-import '../../data/backup_service.dart';
+import '../../core/widgets/confirm_dialog.dart';
+import '../../core/widgets/primary_button.dart';
+import '../../data/db/app_database.dart';
 import '../../data/providers.dart';
-import '../users/user_list_screen.dart';
+import '../billing/billing_providers.dart';
+import '../inventory/inventory_providers.dart';
+import '../khata/khata_providers.dart';
+import 'settings_providers.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final _shopNameController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _gstinController = TextEditingController();
+  final _billFooterController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSettings());
+  }
+
+  Future<void> _loadSettings() async {
+    final repo = await ref.read(settingsRepositoryFutureProvider.future);
+    _shopNameController.text = await repo.get('shop_name') ?? '';
+    _addressController.text = await repo.get('shop_address') ?? '';
+    _phoneController.text = await repo.get('shop_phone') ?? '';
+    _gstinController.text = await repo.get('gstin') ?? '';
+    _billFooterController.text = await repo.get('bill_footer') ?? '';
+    final largeText = await repo.getBool('large_text');
+    ref.read(largeTextProvider.notifier).state = largeText;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _shopNameController.dispose();
+    _addressController.dispose();
+    _phoneController.dispose();
+    _gstinController.dispose();
+    _billFooterController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    final repo = await ref.read(settingsRepositoryFutureProvider.future);
+    await repo.set('shop_name', _shopNameController.text);
+    await repo.set('shop_address', _addressController.text);
+    await repo.set('shop_phone', _phoneController.text);
+    await repo.set('gstin', _gstinController.text);
+    await repo.set('bill_footer', _billFooterController.text);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('સેટિંગ્સ સેવ થયું')),
+      );
+    }
+  }
+
+  Future<void> _exportData() async {
+    try {
+      final json = await AppDatabase.exportToJson();
+      String path;
+      if (Platform.isAndroid || Platform.isIOS) {
+        final dir = await getApplicationDocumentsDirectory();
+        path = '${dir.path}/kirana_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+      } else {
+        final dir = await getApplicationSupportDirectory();
+        path = '${dir.path}/kirana_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+      }
+      final file = File(path);
+      await file.writeAsString(json);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.exportSuccess}\n$path')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.errorGeneric} $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importData() async {
+    final ok = await ConfirmDialog.show(
+      context,
+      title: AppStrings.importData,
+      message: AppStrings.importWarning,
+      confirmLabel: 'હા, ઇમ્પોર્ટ કરો',
+      isDestructive: false,
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty || !mounted) return;
+
+      final path = result.files.single.path;
+      if (path == null) return;
+
+      final file = File(path);
+      final json = await file.readAsString();
+      await AppDatabase.importFromJson(json);
+
+      ref.invalidate(itemListProvider);
+      ref.invalidate(customerListProvider);
+      ref.invalidate(billingItemsProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text(AppStrings.importSuccess)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.errorGeneric} $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final largeText = ref.watch(largeTextProvider);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          AppStrings.settingsTitle,
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontWeight: FontWeight.bold),
+    return Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              AppStrings.settingsTitle,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              AppStrings.shopProfile,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _shopNameController,
+              decoration: const InputDecoration(labelText: AppStrings.shopName),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(labelText: AppStrings.shopAddress),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _phoneController,
+              decoration: const InputDecoration(labelText: AppStrings.shopPhone),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _gstinController,
+              decoration: const InputDecoration(labelText: AppStrings.gstin),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _billFooterController,
+              decoration: const InputDecoration(labelText: AppStrings.billFooter),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            PrimaryButton(
+              label: AppStrings.saveButton,
+              icon: Icons.save,
+              onPressed: _saveProfile,
+            ),
+            const SizedBox(height: 32),
+            Text(
+              AppStrings.largeText,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SwitchListTile(
+              title: const Text(AppStrings.largeText),
+              value: largeText,
+              onChanged: (v) async {
+                ref.read(largeTextProvider.notifier).state = v;
+                final repo = await ref.read(settingsRepositoryFutureProvider.future);
+                await repo.setBool('large_text', v);
+              },
+            ),
+            const SizedBox(height: 32),
+            Text(
+              AppStrings.backupRestore,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            PrimaryButton(
+              label: AppStrings.exportData,
+              icon: Icons.upload_file,
+              onPressed: _exportData,
+            ),
+            const SizedBox(height: 8),
+            PrimaryButton(
+              label: AppStrings.importData,
+              icon: Icons.download,
+              onPressed: _importData,
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        SwitchListTile(
-          title: const Text('મોટા અક્ષર બતાવો'),
-          subtitle: const Text('વાંચવામાં સરળતા માટે ટેક્સ્ટ મોટું કરો'),
-          value: largeText,
-          onChanged: (value) {
-            ref.read(largeTextProvider.notifier).setLargeText(value);
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.people),
-          title: const Text('યુઝર્સ'),
-          subtitle: const Text('ઓનર અને સ્ટાફ મેનેજ કરો'),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const UserListScreen(),
-              ),
-            );
-          },
-        ),
-        const Divider(),
-        const Text(
-          'બેકઅપ અને રીસ્ટોર',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ListTile(
-          leading: const Icon(Icons.upload_file),
-          title: const Text('ડેટા એક્સપોર્ટ કરો'),
-          subtitle: const Text('બધો ડેટા JSON ફાઇલમાં સાચવો'),
-          onTap: () async {
-            try {
-              final path = await BackupService.exportToJson();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('એક્સપોર્ટ થયું: $path')),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('ભૂલ: $e')),
-                );
-              }
-            }
-          },
-        ),
-        ListTile(
-          leading: const Icon(Icons.download),
-          title: const Text('ડેટા ઇમ્પોર્ટ કરો'),
-          subtitle: const Text('પહેલાની બેકઅપ ફાઇલથી ડેટા લાવો'),
-          onTap: () async {
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('ચેતવણી'),
-                content: const Text(
-                  'ઇમ્પોર્ટ કરવાથી હાલનો ડેટા બદલાઈ જશે. શું ચાલુ રાખવું છે?',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: const Text('રદ કરો'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: const Text('બરાબર'),
-                  ),
-                ],
-              ),
-            );
-            if (confirm != true || !context.mounted) return;
-            final result = await FilePicker.platform.pickFiles(
-              type: FileType.custom,
-              allowedExtensions: ['json'],
-            );
-            if (result == null || result.files.single.path == null) return;
-            try {
-              await BackupService.importFromJson(result.files.single.path!);
-              if (context.mounted) {
-                ref.invalidate(itemsListProvider);
-                ref.invalidate(customersWithBalanceProvider);
-                ref.invalidate(reportSummaryProvider);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('ઇમ્પોર્ટ સફળ.')),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('ભૂલ: $e')),
-                );
-              }
-            }
-          },
-        ),
-      ],
+      ),
     );
   }
 }

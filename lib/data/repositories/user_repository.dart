@@ -1,52 +1,44 @@
 import 'package:sqflite/sqflite.dart';
 
-import '../db/app_database.dart';
 import '../models/user.dart';
 
 class UserRepository {
-  Future<Database> get _db async => AppDatabase.database;
+  UserRepository(this._db);
 
-  Future<List<AppUser>> getAll() async {
-    final db = await _db;
-    final rows = await db.query(
-      'users',
-      orderBy: 'name COLLATE NOCASE',
-    );
-    return rows.map(AppUser.fromMap).toList();
+  final Database _db;
+
+  Future<User?> getById(int id) async {
+    final maps = await _db.query('users', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
   }
 
-  Future<AppUser?> getOwner() async {
-    final db = await _db;
-    final rows = await db.query(
+  Future<User?> validatePin(String pin) async {
+    final maps = await _db.query(
       'users',
-      where: 'role = ?',
-      whereArgs: ['owner'],
-      limit: 1,
+      where: 'pin = ? AND is_active = 1',
+      whereArgs: [pin],
     );
-    if (rows.isEmpty) return null;
-    return AppUser.fromMap(rows.first);
+    if (maps.isEmpty) return null;
+    return User.fromMap(maps.first);
   }
 
-  Future<AppUser> insert(AppUser user) async {
-    final db = await _db;
-    final id = await db.insert('users', user.toMap()..remove('id'));
-    return AppUser(
-      id: id,
-      name: user.name,
-      pin: user.pin,
-      role: user.role,
-      isActive: user.isActive,
-    );
+  Future<List<User>> getAll() async {
+    final maps = await _db.query('users', orderBy: 'role ASC');
+    return maps.map((m) => User.fromMap(m)).toList();
   }
 
-  Future<void> update(AppUser user) async {
-    final db = await _db;
-    await db.update(
+  Future<int> insert(User u) async {
+    return _db.insert('users', u.toMap());
+  }
+
+  Future<int> update(User u) async {
+    if (u.id == null) return 0;
+    return _db.update(
       'users',
-      user.toMap()..remove('id'),
+      u.toMap(),
       where: 'id = ?',
-      whereArgs: [user.id],
+      whereArgs: [u.id],
     );
   }
 }
-

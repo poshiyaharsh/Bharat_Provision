@@ -1,29 +1,57 @@
 class Item {
-  Item({
-    this.id,
-    required this.nameGu,
-    this.categoryId,
-    this.barcode,
-    this.unit,
-    required this.salePrice,
-    this.purchasePrice,
-    this.currentStock = 0,
-    this.lowStockThreshold = 0,
-    this.isActive = true,
-  });
-
   final int? id;
   final String nameGu;
   final int? categoryId;
   final String? barcode;
-  final String? unit;
+  final String unit;
   final double salePrice;
-  final double? purchasePrice;
+  final double purchasePrice;
   final double currentStock;
   final double lowStockThreshold;
   final bool isActive;
 
-  bool get isLowStock => currentStock <= lowStockThreshold;
+  const Item({
+    this.id,
+    required this.nameGu,
+    this.categoryId,
+    this.barcode,
+    required this.unit,
+    required this.salePrice,
+    required this.purchasePrice,
+    required this.currentStock,
+    required this.lowStockThreshold,
+    required this.isActive,
+  });
+
+  factory Item.fromMap(Map<String, dynamic> map) {
+    return Item(
+      id: map['id'] as int?,
+      nameGu: map['name_gu'] as String,
+      categoryId: map['category_id'] as int?,
+      barcode: map['barcode'] as String?,
+      unit: map['unit'] as String? ?? 'નંગ',
+      salePrice: (map['sale_price'] as num?)?.toDouble() ?? 0,
+      purchasePrice: (map['purchase_price'] as num?)?.toDouble() ?? 0,
+      currentStock: (map['current_stock'] as num?)?.toDouble() ?? 0,
+      lowStockThreshold: (map['low_stock_threshold'] as num?)?.toDouble() ?? 0,
+      isActive: (map['is_active'] as int? ?? 1) == 1,
+    );
+  }
+
+  Map<String, Object?> toMap() {
+    return {
+      if (id != null) 'id': id,
+      'name_gu': nameGu,
+      'category_id': categoryId,
+      'barcode': barcode,
+      'unit': unit,
+      'sale_price': salePrice,
+      'purchase_price': purchasePrice,
+      'current_stock': currentStock,
+      'low_stock_threshold': lowStockThreshold,
+      'is_active': isActive ? 1 : 0,
+    };
+  }
 
   Item copyWith({
     int? id,
@@ -51,35 +79,5 @@ class Item {
     );
   }
 
-  factory Item.fromMap(Map<String, Object?> map) {
-    return Item(
-      id: map['id'] as int?,
-      nameGu: map['name_gu'] as String,
-      categoryId: map['category_id'] as int?,
-      barcode: map['barcode'] as String?,
-      unit: map['unit'] as String?,
-      salePrice: (map['sale_price'] as num).toDouble(),
-      purchasePrice:
-          map['purchase_price'] != null ? (map['purchase_price'] as num).toDouble() : null,
-      currentStock: (map['current_stock'] as num).toDouble(),
-      lowStockThreshold: (map['low_stock_threshold'] as num).toDouble(),
-      isActive: (map['is_active'] as int) == 1,
-    );
-  }
-
-  Map<String, Object?> toMap() {
-    return {
-      'id': id,
-      'name_gu': nameGu,
-      'category_id': categoryId,
-      'barcode': barcode,
-      'unit': unit,
-      'sale_price': salePrice,
-      'purchase_price': purchasePrice,
-      'current_stock': currentStock,
-      'low_stock_threshold': lowStockThreshold,
-      'is_active': isActive ? 1 : 0,
-    };
-  }
+  bool get isLowStock => currentStock <= lowStockThreshold;
 }
-

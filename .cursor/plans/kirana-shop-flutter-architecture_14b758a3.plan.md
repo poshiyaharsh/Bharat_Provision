@@ -84,13 +84,13 @@ We’ll create a small, normalized schema with clear relations, designed so a fu
     - `quantity` (REAL)
     - `unit_price` (REAL)
     - `line_total` (REAL)
-  - `**customers**`
+  - `**customers`**
     - `id` (PK)
     - `name` (TEXT)
     - `phone` (TEXT)
     - `address` (TEXT)
     - `note` (TEXT)
-  - `**khata_entries**` (customer udhar ledger)
+  - `**khata_entries`** (customer udhar ledger)
     - `id` (PK)
     - `customer_id` (FK -> `customers.id`)
     - `related_bill_id` (FK -> `bills.id`, nullable for manual entry)
@@ -99,7 +99,7 @@ We’ll create a small, normalized schema with clear relations, designed so a fu
     - `amount` (REAL)
     - `note` (TEXT)
     - `balance_after` (REAL, cached running balance for fast UI)
-  - `**purchases**` (stock purchase entries, optional v1 detail level)
+  - `**purchases`** (stock purchase entries, optional v1 detail level)
     - `id`, `date_time`, `supplier_name`, `total_amount`, etc.
   - `**purchase_items**`
     - `id`, `purchase_id`, `item_id`, `quantity`, `unit_cost`, `line_total`.

@@ -2,124 +2,164 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_strings.dart';
-import '../../core/utils/formatters.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/currency_format.dart';
 import '../../data/providers.dart';
-import 'sales_report_screen.dart';
+import 'reports_providers.dart';
 
 class ReportsHomeScreen extends ConsumerWidget {
   const ReportsHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final today = ref.watch(reportSummaryProvider('today'));
-    final week = ref.watch(reportSummaryProvider('week'));
-    final month = ref.watch(reportSummaryProvider('month'));
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final todayEnd = now.millisecondsSinceEpoch;
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final weekStartEpoch = DateTime(weekStart.year, weekStart.month, weekStart.day).millisecondsSinceEpoch;
+    final monthStart = DateTime(now.year, now.month, 1).millisecondsSinceEpoch;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          AppStrings.reportsTitle,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 16),
-        today.when(
-          data: (d) => _SummaryCard(
-            title: 'આજનું વેચાણ',
-            total: d.total,
-            count: d.count,
-            color: Colors.green,
-          ),
-          loading: () => const _SummaryCardPlaceholder(),
-          error: (_, __) => const Card(child: ListTile(title: Text('ભૂલ'))),
-        ),
-        const SizedBox(height: 12),
-        week.when(
-          data: (d) => _SummaryCard(
-            title: 'આ સપ્તાહનું વેચાણ',
-            total: d.total,
-            count: d.count,
-            color: Colors.blue,
-          ),
-          loading: () => const _SummaryCardPlaceholder(),
-          error: (_, __) => const Card(child: ListTile(title: Text('ભૂલ'))),
-        ),
-        const SizedBox(height: 12),
-        month.when(
-          data: (d) => _SummaryCard(
-            title: 'આ મહિનાનું વેચાણ',
-            total: d.total,
-            count: d.count,
-            color: Colors.orange,
-          ),
-          loading: () => const _SummaryCardPlaceholder(),
-          error: (_, __) => const Card(child: ListTile(title: Text('ભૂલ'))),
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const SalesReportScreen(),
+    return Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              AppStrings.reportsTitle,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 24),
+            _SalesCard(
+              title: AppStrings.todaySales,
+              startEpoch: todayStart,
+              endEpoch: todayEnd,
+            ),
+            const SizedBox(height: 12),
+            _SalesCard(
+              title: AppStrings.weekSales,
+              startEpoch: weekStartEpoch,
+              endEpoch: todayEnd,
+            ),
+            const SizedBox(height: 12),
+            _SalesCard(
+              title: AppStrings.monthSales,
+              startEpoch: monthStart,
+              endEpoch: todayEnd,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              AppStrings.outstandingKhata,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            ref.watch(outstandingKhataProvider).when(
+              data: (customers) {
+                if (customers.isEmpty) {
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('કોઈ બાકી ખાતા નથી'),
+                    ),
+                  );
+                }
+                return Card(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: customers.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (ctx, i) {
+                      final c = customers[i];
+                      return ListTile(
+                        title: Text(c.name),
+                        trailing: Text(
+                          formatCurrency(c.balance),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.alert,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+              loading: () => const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
                 ),
-              );
-            },
-            icon: const Icon(Icons.date_range),
-            label: const Text('તારીખ પસંદ કરીને અહેવાલ જુઓ'),
-          ),
+              ),
+              error: (e, _) => Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('${AppStrings.errorGeneric} $e'),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _SalesCard extends ConsumerWidget {
+  const _SalesCard({
     required this.title,
-    required this.total,
-    required this.count,
-    required this.color,
+    required this.startEpoch,
+    required this.endEpoch,
   });
 
   final String title;
-  final double total;
-  final int count;
-  final Color color;
+  final int startEpoch;
+  final int endEpoch;
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Icon(Icons.receipt_long, color: color, size: 40),
-        title: Text(title),
-        subtitle: Text('બિલ: $count'),
-        trailing: Text(
-          Formatters.formatCurrency(total),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SummaryCardPlaceholder extends StatelessWidget {
-  const _SummaryCardPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Card(
-      child: ListTile(
-        leading: CircularProgressIndicator(),
-        title: Text('લોડ થઈ રહ્યું છે...'),
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder(
+      future: ref.read(reportRepositoryFutureProvider.future).then(
+            (repo) => repo.getSalesSummary(startEpoch, endEpoch),
+          ),
+      builder: (ctx, snap) {
+        final summary = snap.data;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                if (summary != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${AppStrings.totalSales}: ${formatCurrency(summary.totalSales)}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text('${AppStrings.billCount}: ${summary.billCount}'),
+                    ],
+                  )
+                else
+                  const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

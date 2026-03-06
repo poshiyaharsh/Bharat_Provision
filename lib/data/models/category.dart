@@ -1,15 +1,15 @@
 class Category {
-  Category({
+  final int? id;
+  final String nameGu;
+  final String? colorCode;
+
+  const Category({
     this.id,
     required this.nameGu,
     this.colorCode,
   });
 
-  final int? id;
-  final String nameGu;
-  final String? colorCode;
-
-  factory Category.fromMap(Map<String, Object?> map) {
+  factory Category.fromMap(Map<String, dynamic> map) {
     return Category(
       id: map['id'] as int?,
       nameGu: map['name_gu'] as String,
@@ -19,10 +19,17 @@ class Category {
 
   Map<String, Object?> toMap() {
     return {
-      'id': id,
+      if (id != null) 'id': id,
       'name_gu': nameGu,
       'color_code': colorCode,
     };
   }
-}
 
+  Category copyWith({int? id, String? nameGu, String? colorCode}) {
+    return Category(
+      id: id ?? this.id,
+      nameGu: nameGu ?? this.nameGu,
+      colorCode: colorCode ?? this.colorCode,
+    );
+  }
+}

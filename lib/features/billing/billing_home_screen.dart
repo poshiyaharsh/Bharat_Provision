@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_strings.dart';
-import '../../core/utils/formatters.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/utils/currency_format.dart';
 import '../../core/widgets/numpad.dart';
-import '../../data/models/bill_item.dart';
+import '../../data/models/item.dart';
 import '../../data/providers.dart';
+import '../../data/repositories/bill_repository.dart';
 import 'billing_providers.dart';
-import 'cart_state.dart';
-import 'payment_dialog.dart';
 
 class BillingHomeScreen extends ConsumerStatefulWidget {
   const BillingHomeScreen({super.key});
@@ -18,303 +18,464 @@ class BillingHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
-  String _search = '';
+  final _searchController = TextEditingController();
+  final _quantityController = TextEditingController();
 
-  Future<void> _saveBill() async {
-    final cart = ref.read(cartProvider);
-    if (cart.lines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('પહેલા વસ્તુઓ ઉમેરો.')),
-      );
-      return;
-    }
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      ref.read(itemSearchQueryProvider.notifier).state = _searchController.text;
+    });
+  }
 
-    final total = cart.totalAmount;
-    showPaymentDialog(
-      context,
-      amountDue: total,
-      onConfirm: (paidAmount, paymentMode) async {
-        final billRepo = ref.read(billRepositoryProvider);
-        final billItems = cart.lines
-            .map(
-              (l) => BillItem(
-                billId: 0,
-                itemId: l.itemId,
-                quantity: l.quantity,
-                unitPrice: l.unitPrice,
-                lineTotal: l.lineTotal,
-              ),
-            )
-            .toList();
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _quantityController.dispose();
+    super.dispose();
+  }
 
-        try {
-          await billRepo.createBillWithStockAndKhata(
-            billItems: billItems,
-            discountAmount: cart.discountAmount,
-            paidAmount: paidAmount,
-            paymentMode: paymentMode,
-            customerId: null,
-            createdByUserId: null,
-          );
-          ref.read(cartProvider.notifier).clear();
-          ref.invalidate(itemsListProvider);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('બીલ સાચવ્યું.')),
-            );
-          }
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('ભૂલ: $e')),
-            );
-          }
-        }
-      },
-    );
+  Color _stockColor(Item item) {
+    if (item.isLowStock) return AppColors.alert;
+    if (item.currentStock <= item.lowStockThreshold * 1.2) return AppColors.warning;
+    return AppColors.success;
   }
 
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
-    final asyncItems = ref.watch(itemsListProvider(_search));
+    final itemsAsync = ref.watch(billingItemsProvider);
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(8),
-          child: TextField(
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'વસ્તુ શોધો અથવા ટૅપ કરો...',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (value) => setState(() => _search = value),
-          ),
-        ),
-        Expanded(
-          child: Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 600 && constraints.maxWidth.isFinite;
+        if (isWide) {
+          return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
                 flex: 2,
-                child: Card(
-                  margin: const EdgeInsets.all(8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          'વસ્તુઓ',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      Expanded(
-                        child: asyncItems.when(
-                          data: (items) {
-                            if (items.isEmpty) {
-                              return const Center(
-                                child: Text('પહેલા સ્ટોકમાં વસ્તુઓ ઉમેરો.'),
-                              );
-                            }
-                            return ListView.builder(
-                              itemCount: items.length,
-                              itemBuilder: (context, index) {
-                                final item = items[index];
-                                return ListTile(
-                                  title: Text(item.nameGu),
-                                  subtitle: Text(
-                                    Formatters.formatCurrency(item.salePrice),
-                                  ),
-                                  trailing: const Icon(Icons.add_circle),
-                                  onTap: () {
-                                    ref.read(cartProvider.notifier).addItem(item);
-                                  },
-                                );
-                              },
-                            );
-                          },
-                          loading: () => const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                          error: (e, _) => Center(
-                            child: Text('ભૂલ: $e'),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                child: _ItemList(
+                  itemsAsync: itemsAsync,
+                  onItemTap: _onItemTap,
+                  searchController: _searchController,
+                  stockColor: _stockColor,
                 ),
               ),
+              const VerticalDivider(width: 1),
               Expanded(
-                flex: 2,
-                child: Card(
-                  margin: const EdgeInsets.all(8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          'કાર્ટ',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      Expanded(
-                        child: cart.lines.isEmpty
-                            ? const Center(
-                                child: Text('અહીં વસ્તુઓ દેખાશે.'),
-                              )
-                            : ListView.builder(
-                                itemCount: cart.lines.length,
-                                itemBuilder: (context, index) {
-                                  final line = cart.lines[index];
-                                  return ListTile(
-                                    title: Text(line.itemName),
-                                    subtitle: Text(
-                                      '${line.quantity} x ${Formatters.formatCurrency(line.unitPrice)} = ${Formatters.formatCurrency(line.lineTotal)}',
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.edit),
-                                          onPressed: () {
-                                            var q = line.quantity;
-                                            showModalBottomSheet<void>(
-                                              context: context,
-                                              builder: (ctx) => Padding(
-                                                padding: const EdgeInsets.all(16),
-                                                child: Column(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Text(
-                                                      '${line.itemName} - માત્રા',
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .titleMedium,
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Numpad(
-                                                      initialValue: q.toString(),
-                                                      onChanged: (v) {
-                                                        final parsed =
-                                                            double.tryParse(v);
-                                                        if (parsed != null &&
-                                                            parsed > 0) {
-                                                          q = parsed;
-                                                          ref
-                                                              .read(cartProvider
-                                                                  .notifier)
-                                                              .updateQuantity(
-                                                                  index, q);
-                                                        }
-                                                      },
-                                                      onSubmit: () =>
-                                                          Navigator.pop(ctx),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.remove_circle),
-                                          onPressed: () {
-                                            ref
-                                                .read(cartProvider.notifier)
-                                                .removeAt(index);
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                      if (!cart.lines.isEmpty) ...[
-                        const Divider(),
-                        ListTile(
-                          title: const Text('સબટોટલ'),
-                          trailing: Text(
-                            Formatters.formatCurrency(cart.subtotal),
-                          ),
-                        ),
-                        ListTile(
-                          title: const Text('ડિસ્કાઉન્ટ (₹)'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                Formatters.formatCurrency(cart.discountAmount),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () {
-                                  showModalBottomSheet<void>(
-                                    context: context,
-                                    builder: (ctx) => Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Text('ડિસ્કાઉન્ટ રકમ દાખલ કરો'),
-                                          const SizedBox(height: 8),
-                                          Numpad(
-                                            initialValue: cart.discountAmount > 0
-                                                ? cart.discountAmount.toString()
-                                                : '',
-                                            onChanged: (v) {
-                                              ref
-                                                  .read(cartProvider.notifier)
-                                                  .setDiscount(
-                                                      double.tryParse(v) ?? 0);
-                                            },
-                                            onSubmit: () =>
-                                                Navigator.pop(ctx),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        ListTile(
-                          title: const Text('કુલ'),
-                          trailing: Text(
-                            Formatters.formatCurrency(cart.totalAmount),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton.icon(
-                              onPressed: _saveBill,
-                              icon: const Icon(Icons.save),
-                              label: const Text('બચાવો અને બીલ પ્રિન્ટ કરો'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                child: _CartPanel(
+                  cart: cart,
+                  onQuantityTap: _showQuantityDialog,
+                  onRemoveAt: (i) => ref.read(cartProvider.notifier).removeAt(i),
+                  onDiscountTap: _showDiscountDialog,
+                  onPayTap: _showPaymentDialog,
+                  hasFlexibleHeight: true,
                 ),
               ),
             ],
+          );
+        }
+        return Column(
+          children: [
+            Expanded(
+              child: _ItemList(
+                itemsAsync: itemsAsync,
+                onItemTap: _onItemTap,
+                searchController: _searchController,
+                stockColor: _stockColor,
+              ),
+            ),
+            const Divider(height: 1),
+            SizedBox(
+              height: 220,
+              child: _CartPanel(
+                cart: cart,
+                onQuantityTap: _showQuantityDialog,
+                onRemoveAt: (i) => ref.read(cartProvider.notifier).removeAt(i),
+                onDiscountTap: _showDiscountDialog,
+                onPayTap: _showPaymentDialog,
+                hasFlexibleHeight: false,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _onItemTap(Item item) {
+    ref.read(cartProvider.notifier).addItem(item);
+  }
+
+  void _showQuantityDialog(int index) {
+    final line = ref.read(cartProvider).lines[index];
+    final ctrl = TextEditingController(text: line.quantity.toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${line.item.nameGu} - ${AppStrings.currentStock}'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                NumpadTextField(
+                  controller: ctrl,
+                  allowDecimal: true,
+                  decoration: const InputDecoration(labelText: 'Quantity'),
+                ),
+                const SizedBox(height: 16),
+                NumpadWidget(
+                  controller: ctrl,
+                  allowDecimal: true,
+                  onSubmit: () {
+                    final qty = double.tryParse(ctrl.text) ?? 1;
+                    ref.read(cartProvider.notifier).updateQuantity(index, qty);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDiscountDialog() {
+    final ctrl = TextEditingController(text: ref.read(cartProvider).discountAmount.toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppStrings.discount),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                NumpadTextField(
+                  controller: ctrl,
+                  allowDecimal: true,
+                  decoration: const InputDecoration(labelText: 'Amount'),
+                ),
+                const SizedBox(height: 16),
+                NumpadWidget(
+                  controller: ctrl,
+                  allowDecimal: true,
+                  onSubmit: () {
+                    final amt = double.tryParse(ctrl.text) ?? 0;
+                    ref.read(cartProvider.notifier).setDiscount(amt);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPaymentDialog() async {
+    final cart = ref.read(cartProvider);
+    if (cart.lines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text(AppStrings.errorGeneric)),
+      );
+      return;
+    }
+
+    final paidCtrl = TextEditingController(text: cart.total.toStringAsFixed(2));
+    String paymentMode = 'cash';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text(AppStrings.payNow),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('${AppStrings.total}: ${formatCurrency(cart.total)}'),
+                const SizedBox(height: 8),
+                NumpadTextField(
+                  controller: paidCtrl,
+                  allowDecimal: true,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.amountReceived,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text(AppStrings.cash),
+                      selected: paymentMode == 'cash',
+                      onSelected: (_) => setState(() => paymentMode = 'cash'),
+                    ),
+                    ChoiceChip(
+                      label: const Text(AppStrings.upi),
+                      selected: paymentMode == 'upi',
+                      onSelected: (_) => setState(() => paymentMode = 'upi'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text(AppStrings.cancelButton),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text(AppStrings.saveButton),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final paid = double.tryParse(paidCtrl.text) ?? cart.total;
+    final billRepo = await ref.read(billRepositoryFutureProvider.future);
+
+    try {
+      final billId = await billRepo.createBill(
+        customerId: cart.customerId,
+        items: cart.lines
+            .map((l) => BillItemInput(
+                  itemId: l.item.id!,
+                  quantity: l.quantity,
+                  unitPrice: l.unitPrice,
+                ))
+            .toList(),
+        discountAmount: cart.discountAmount,
+        paidAmount: paid,
+        paymentMode: paymentMode,
+      );
+
+      ref.read(cartProvider.notifier).clear();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('બીલ #$billId સફળતાપૂર્વક સેવ થયું')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${AppStrings.errorGeneric} $e')),
+        );
+      }
+    }
+  }
+}
+
+class _ItemList extends StatelessWidget {
+  const _ItemList({
+    required this.itemsAsync,
+    required this.onItemTap,
+    required this.searchController,
+    required this.stockColor,
+  });
+
+  final AsyncValue<List<Item>> itemsAsync;
+  final void Function(Item) onItemTap;
+  final TextEditingController searchController;
+  final Color Function(Item) stockColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: TextField(
+            controller: searchController,
+            decoration: InputDecoration(
+              hintText: AppStrings.searchHintItems,
+              prefixIcon: const Icon(Icons.search),
+            ),
+          ),
+        ),
+        Expanded(
+          child: itemsAsync.when(
+            data: (items) {
+              if (items.isEmpty) {
+                return Center(child: Text(AppStrings.noItemsFound));
+              }
+              return ListView.builder(
+                itemCount: items.length,
+                itemBuilder: (ctx, i) {
+                  final item = items[i];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: stockColor(item),
+                      child: const Icon(Icons.inventory_2, color: Colors.white),
+                    ),
+                    title: Text(item.nameGu),
+                    subtitle: Text(
+                      '${formatCurrency(item.salePrice)} • ${item.currentStock} ${item.unit}',
+                    ),
+                    onTap: () => onItemTap(item),
+                  );
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('${AppStrings.errorGeneric} $e')),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CartPanel extends StatelessWidget {
+  const _CartPanel({
+    required this.cart,
+    required this.onQuantityTap,
+    required this.onRemoveAt,
+    required this.onDiscountTap,
+    required this.onPayTap,
+    this.hasFlexibleHeight = true,
+  });
+
+  final CartState cart;
+  final void Function(int) onQuantityTap;
+  final void Function(int) onRemoveAt;
+  final VoidCallback onDiscountTap;
+  final VoidCallback onPayTap;
+  final bool hasFlexibleHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final listContent = ListView.builder(
+      itemCount: cart.lines.length,
+      itemBuilder: (ctx, i) {
+        final line = cart.lines[i];
+        return ListTile(
+          dense: true,
+          title: Text(line.item.nameGu),
+          subtitle: Text(
+            '${line.quantity} x ${formatCurrency(line.unitPrice)} = ${formatCurrency(line.lineTotal)}',
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit, size: 20),
+                onPressed: () => onQuantityTap(i),
+              ),
+              IconButton(
+                icon: const Icon(Icons.remove_circle_outline, size: 20),
+                onPressed: () => onRemoveAt(i),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    final footer = Padding(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Text(AppStrings.subtotal),
+              Text(formatCurrency(cart.subtotal)),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Flexible(
+                child: TextButton(
+                  onPressed: onDiscountTap,
+                  child: Text(AppStrings.discount),
+                ),
+              ),
+              Text(formatCurrency(-cart.discountAmount)),
+            ],
+          ),
+          const Divider(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Flexible(
+                child: Text(
+                  AppStrings.total,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                formatCurrency(cart.total),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: cart.lines.isEmpty ? null : onPayTap,
+              icon: const Icon(Icons.payment),
+              label: const Text(AppStrings.saveAndPrint),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (hasFlexibleHeight) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              AppStrings.cart,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          Expanded(child: listContent),
+          footer,
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(4),
+          child: Text(
+            AppStrings.cart,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        Expanded(child: listContent),
+        footer,
       ],
     );
   }
