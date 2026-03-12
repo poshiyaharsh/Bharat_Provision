@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart'; // TODO: Add to pubspec.yaml
 
 import '../../core/constants/app_strings.dart' as strings;
 import '../../core/utils/currency_format.dart';
@@ -9,7 +9,7 @@ import '../../shared/models/product_model.dart';
 import '../../shared/providers/product_provider.dart';
 import 'billing_providers.dart';
 
-/// Smart Billing screen (P04) – multi-tab, auto-weight, customer + payment flow.
+/// Simplified single-screen billing - Create bills and print them.
 class BillingHomeScreen extends ConsumerStatefulWidget {
   const BillingHomeScreen({super.key});
 
@@ -19,11 +19,8 @@ class BillingHomeScreen extends ConsumerStatefulWidget {
 
 class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   final _searchController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  List<BillLineItem> _billLines = [];
+  double _discount = 0;
 
   @override
   void dispose() {
@@ -31,96 +28,13 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
     super.dispose();
   }
 
-  bool get _isDesktopLayout {
-    final size = MediaQuery.of(context).size;
-    return size.width > 700;
-  }
+  double get _subtotal => _billLines.fold(0, (sum, line) => sum + line.amount);
+  double get _total => _subtotal - _discount;
 
-  @override
-  Widget build(BuildContext context) {
-    final tabsState = ref.watch(billingTabsProvider);
-
-    Widget content = Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          flex: 2,
-          child: _ProductPanel(
-            searchController: _searchController,
-            onProductSelected: (product) => _openEntryDialog(product),
-          ),
-        ),
-        const VerticalDivider(width: 1),
-        Expanded(
-          flex: 3,
-          child: _BillPanel(
-            tabsState: tabsState,
-            onTabSelected: (index) =>
-                ref.read(billingTabsProvider.notifier).switchToTab(index),
-            onClearCurrent: () => _confirmClearCurrentTab(),
-          ),
-        ),
-      ],
-    );
-
-    if (!_isDesktopLayout) {
-      content = Column(
-        children: [
-          Expanded(
-            flex: 2,
-            child: _ProductPanel(
-              searchController: _searchController,
-              onProductSelected: (product) => _openEntryDialog(product),
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            flex: 3,
-            child: _BillPanel(
-              tabsState: tabsState,
-              onTabSelected: (index) =>
-                  ref.read(billingTabsProvider.notifier).switchToTab(index),
-              onClearCurrent: () => _confirmClearCurrentTab(),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return RawKeyboardListener(
-      focusNode: FocusNode(),
-      onKey: (event) {
-        if (event is! RawKeyDownEvent) return;
-        final isCtrlPressed =
-            event.isControlPressed || event.data.isModifierPressed(ModifierKey.controlModifier);
-        if (!isCtrlPressed) return;
-        final keyLabel = event.logicalKey.keyLabel;
-        final index = switch (keyLabel) {
-          '1' => 0,
-          '2' => 1,
-          '3' => 2,
-          '4' => 3,
-          '5' => 4,
-          _ => -1,
-        };
-        if (index >= 0) {
-          ref.read(billingTabsProvider.notifier).switchToTab(index);
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(strings.AppStrings.billingTitle),
-        ),
-        body: content,
-      ),
-    );
-  }
-
-  Future<void> _openEntryDialog(Product product) async {
-    final notifier = ref.read(billingTabsProvider.notifier);
+  void _addProductToBill(Product product) async {
     double amountPaid = product.sellPrice;
     double weightGrams = 1000;
-    String mode = 'amount'; // 'amount' | 'weight'
+    String mode = 'amount';
 
     await showDialog<void>(
       context: context,
@@ -166,18 +80,15 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                   const SizedBox(height: 12),
                   if (mode == 'amount') ...[
                     TextField(
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: '₹ રકમ દાખલ કરો',
                       ),
                       onChanged: (v) {
                         final parsed = double.tryParse(v);
-                        if (parsed != null) {
-                          setState(() {
-                            amountPaid = parsed;
-                          });
-                        }
+                        if (parsed != null) setState(() => amountPaid = parsed);
                       },
                     ),
                     const SizedBox(height: 8),
@@ -192,18 +103,16 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                       ),
                   ] else ...[
                     TextField(
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: const InputDecoration(
                         labelText: 'ગ્રામમાં વજન દાખલ કરો',
                       ),
                       onChanged: (v) {
                         final parsed = double.tryParse(v);
-                        if (parsed != null) {
-                          setState(() {
-                            weightGrams = parsed;
-                          });
-                        }
+                        if (parsed != null)
+                          setState(() => weightGrams = parsed);
                       },
                     ),
                     const SizedBox(height: 8),
@@ -226,31 +135,29 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    double finalAmount;
-                    double finalQty;
+                    double finalAmount, finalQty;
                     if (mode == 'amount') {
-                      final weight = WeightCalculator.calculateWeightFromAmount(
+                      finalQty = WeightCalculator.calculateWeightFromAmount(
                         amountPaid: amountPaid,
                         sellPricePerKg: product.sellPrice,
                       );
                       finalAmount = amountPaid;
-                      finalQty = weight;
                     } else {
-                      final amount = WeightCalculator.calculateAmountFromWeight(
+                      finalAmount = WeightCalculator.calculateAmountFromWeight(
                         weightGrams: weightGrams,
                         sellPricePerKg: product.sellPrice,
                       );
-                      finalAmount = amount;
                       finalQty = weightGrams;
                     }
-
-                    notifier.addLineToActive(
-                      BillLine(
-                        product: product,
-                        qtyGrams: finalQty,
-                        amount: finalAmount,
-                      ),
-                    );
+                    setState(() {
+                      _billLines.add(
+                        BillLineItem(
+                          product: product,
+                          qtyGrams: finalQty,
+                          amount: finalAmount,
+                        ),
+                      );
+                    });
                     Navigator.of(ctx).pop();
                   },
                   child: const Text(strings.AppStrings.addButton),
@@ -263,53 +170,153 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
     );
   }
 
-  Future<void> _confirmClearCurrentTab() async {
-    final ok = await showDialog<bool>(
+  void _removeLine(int index) {
+    setState(() => _billLines.removeAt(index));
+  }
+
+  void _setDiscount() async {
+    final controller = TextEditingController(
+      text: _discount.toStringAsFixed(2),
+    );
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ટેબ સાફ કરો?'),
-        content: const Text('હાલનો બિલ ટેબ પૂરો ખાલી થશે. ખાતરી છે?'),
+        title: const Text('ડિસ્કાઉન્ટ સેટ કરો'),
+        content: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(labelText: '₹ રકમ'),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(),
             child: const Text(strings.AppStrings.cancelButton),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(strings.AppStrings.clearButton),
+            onPressed: () {
+              setState(() => _discount = double.tryParse(controller.text) ?? 0);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text(strings.AppStrings.saveButton),
           ),
         ],
       ),
     );
-    if (ok == true) {
-      ref.read(billingTabsProvider.notifier).clearActive();
+  }
+
+  Future<void> _printBill() async {
+    if (_billLines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('બિલ ખાલી છે. કૃપया આઇટમ ઉમેરો.')),
+      );
+      return;
+    }
+    try {
+      final billText = _generateBillText();
+      // TODO: Integrate with print_bluetooth_thermal package
+      // For now, show bill in a dialog
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('બિલ ટેક્સ્ટ'),
+          content: SingleChildScrollView(
+            child: Text(
+              billText,
+              style: const TextStyle(fontFamily: 'monospace'),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('બંધ કરો'),
+            ),
+          ],
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('બિલ તૈયાર! (Bluetooth print pending integration)'),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('ભૂલ: $e')));
     }
   }
-}
 
-class _ProductPanel extends ConsumerWidget {
-  const _ProductPanel({
-    required this.searchController,
-    required this.onProductSelected,
-  });
-
-  final TextEditingController searchController;
-  final void Function(Product product) onProductSelected;
+  String _generateBillText() {
+    StringBuffer buffer = StringBuffer();
+    buffer.writeln('===============================');
+    buffer.writeln('            બિલ');
+    buffer.writeln('===============================\n');
+    for (var line in _billLines) {
+      buffer.writeln('${line.product.nameGujarati}');
+      buffer.writeln(
+        '  ${WeightCalculator.formatWeight(line.qtyGrams)}  ${formatCurrency(line.amount)}',
+      );
+    }
+    buffer.writeln('\n-------------------------------');
+    buffer.writeln('કુલ: ${formatCurrency(_subtotal)}');
+    if (_discount > 0) buffer.writeln('ડિસ્ક: -${formatCurrency(_discount)}');
+    buffer.writeln('-------------------------------');
+    buffer.writeln('દેય: ${formatCurrency(_total)}');
+    buffer.writeln('===============================');
+    buffer.writeln('ધન્યવાદ!');
+    return buffer.toString();
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(productProvider);
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(strings.AppStrings.billingTitle),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            onPressed: _printBill,
+            tooltip: 'બિલ છાપો',
+          ),
+        ],
+      ),
+      body: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
+    );
+  }
 
+  Widget _buildDesktopLayout() {
+    return Row(
+      children: [
+        Expanded(flex: 2, child: _buildProductPanel()),
+        const VerticalDivider(width: 1),
+        Expanded(flex: 3, child: _buildBillPanel()),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout() {
+    return Column(
+      children: [
+        Expanded(flex: 2, child: _buildProductPanel()),
+        const Divider(height: 1),
+        Expanded(flex: 3, child: _buildBillPanel()),
+      ],
+    );
+  }
+
+  Widget _buildProductPanel() {
+    final state = ref.watch(productProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.all(8),
           child: TextField(
-            controller: searchController,
+            controller: _searchController,
             decoration: const InputDecoration(
               prefixIcon: Icon(Icons.search),
               hintText: strings.AppStrings.searchHintProducts,
+              border: OutlineInputBorder(),
             ),
             onChanged: (value) {
               if (value.trim().isEmpty) {
@@ -333,14 +340,10 @@ class _ProductPanel extends ConsumerWidget {
                 itemBuilder: (ctx, i) {
                   final p = products[i];
                   return ListTile(
-                    leading: const CircleAvatar(
-                      child: Icon(Icons.inventory_2),
-                    ),
+                    leading: const Icon(Icons.inventory_2),
                     title: Text(p.nameGujarati),
-                    subtitle: Text(
-                      '₹${p.sellPrice.toStringAsFixed(2)} • ${p.stockQty.toStringAsFixed(0)}',
-                    ),
-                    onTap: () => onProductSelected(p),
+                    subtitle: Text('₹${p.sellPrice.toStringAsFixed(2)}'),
+                    onTap: () => _addProductToBill(p),
                   );
                 },
               );
@@ -353,95 +356,57 @@ class _ProductPanel extends ConsumerWidget {
       ],
     );
   }
-}
 
-class _BillPanel extends ConsumerWidget {
-  const _BillPanel({
-    required this.tabsState,
-    required this.onTabSelected,
-    required this.onClearCurrent,
-  });
-
-  final BillingTabsState tabsState;
-  final void Function(int index) onTabSelected;
-  final VoidCallback onClearCurrent;
-
-  Color _tabColor(BillDraft draft, bool isActive) {
-    if (draft.isEmpty) return Colors.grey.shade400;
-    if (isActive) return Colors.green.shade700;
-    return Colors.green.shade400;
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final draft = tabsState.activeDraft;
-
+  Widget _buildBillPanel() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            children: List.generate(5, (index) {
-              final d = tabsState.drafts[index];
-              final isActive = index == tabsState.activeIndex;
-              final itemCount = d.lines.length;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(
-                  label: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Bill-${index + 1}'),
-                      if (itemCount > 0) ...[
-                        const SizedBox(width: 4),
-                        CircleAvatar(
-                          radius: 9,
-                          backgroundColor: Colors.white,
-                          child: Text(
-                            '$itemCount',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  selected: isActive,
-                  selectedColor: _tabColor(d, true),
-                  backgroundColor: _tabColor(d, false),
-                  labelStyle: const TextStyle(color: Colors.white),
-                  onSelected: (_) => onTabSelected(index),
-                ),
-              );
-            }),
+          child: const Text(
+            'હાલનો બિલ',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
         const Divider(height: 1),
-        Expanded(
-          child: ListView.builder(
-            itemCount: draft.lines.length,
-            itemBuilder: (ctx, i) {
-              final line = draft.lines[i];
-              return ListTile(
-                title: Text(line.product.nameGujarati),
-                subtitle: Text(
-                  '${WeightCalculator.formatWeight(line.qtyGrams)} = ${formatCurrency(line.amount)}',
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: () =>
-                      ref.read(billingTabsProvider.notifier).removeLineFromActive(i),
-                ),
-              );
-            },
+        if (_billLines.isEmpty)
+          const Expanded(child: Center(child: Text('કોઇ આઇટમ નહીં')))
+        else
+          Expanded(
+            child: ListView.builder(
+              itemCount: _billLines.length,
+              itemBuilder: (ctx, i) {
+                final line = _billLines[i];
+                return Dismissible(
+                  key: Key(i.toString()),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    color: Colors.red,
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 16),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (_) => _removeLine(i),
+                  child: ListTile(
+                    title: Text(line.product.nameGujarati),
+                    subtitle: Text(
+                      WeightCalculator.formatWeight(line.qtyGrams),
+                    ),
+                    trailing: Text(
+                      formatCurrency(line.amount),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
         const Divider(height: 1),
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -449,61 +414,60 @@ class _BillPanel extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Subtotal'),
-                  Text(formatCurrency(draft.subtotal)),
-                ],
-              ),
-              Row(
-                children: [
-                  SizedBox(
-                    height: 40,
-                    child: TextButton(
-                      onPressed: () => _showDiscountDialog(context, ref, draft),
-                      child: const Text('Discount'),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(formatCurrency(-draft.discountAmount)),
-                ],
-              ),
-              const Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Grand Total',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
+                  const Text('કુલ:'),
                   Text(
-                    formatCurrency(draft.total),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
+                    formatCurrency(_subtotal),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: draft.lines.isEmpty
-                          ? null
-                          : () {
-                              // Payment + save flow will be wired in next step.
-                            },
-                      icon: const Icon(Icons.save),
-                      label: const Text('બિલ બનાવો'),
+                  GestureDetector(
+                    onTap: _setDiscount,
+                    child: const Text(
+                      'ડિસ્કાઉન્ટ:',
+                      style: TextStyle(decoration: TextDecoration.underline),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: draft.isEmpty ? null : onClearCurrent,
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    tooltip: 'ટેબ ક્લિયર',
+                  Text(
+                    '-${formatCurrency(_discount)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
+              ),
+              const Divider(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'દેય:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  Text(
+                    formatCurrency(_total),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.clear),
+                label: const Text('બિલ ક્લીયર કરો'),
+                onPressed: _billLines.isEmpty
+                    ? null
+                    : () {
+                        setState(() {
+                          _billLines.clear();
+                          _discount = 0;
+                        });
+                      },
               ),
             ],
           ),
@@ -511,40 +475,17 @@ class _BillPanel extends ConsumerWidget {
       ],
     );
   }
-
-  Future<void> _showDiscountDialog(
-    BuildContext context,
-    WidgetRef ref,
-    BillDraft draft,
-  ) async {
-    final controller = TextEditingController(
-      text: draft.discountAmount.toStringAsFixed(2),
-    );
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ડિસ્કાઉન્ટ'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: '₹ રકમ'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(strings.AppStrings.cancelButton),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(strings.AppStrings.saveButton),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      final value = double.tryParse(controller.text) ?? 0;
-      ref.read(billingTabsProvider.notifier).setDiscountForActive(value);
-    }
-  }
 }
 
+/// Simple bill line item model.
+class BillLineItem {
+  final Product product;
+  final double qtyGrams;
+  final double amount;
+
+  BillLineItem({
+    required this.product,
+    required this.qtyGrams,
+    required this.amount,
+  });
+}
