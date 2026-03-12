@@ -31,12 +31,7 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
   bool _loading = true;
   Item? _item;
 
-  static const List<String> _units = [
-    'નંગ',
-    'કિલો',
-    'ગ્રામ',
-    'લીટર',
-  ];
+  static const List<String> _units = ['નંગ', 'કિલો', 'ગ્રામ', 'લીટર'];
 
   @override
   void initState() {
@@ -90,9 +85,9 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text(AppStrings.fieldRequired)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text(AppStrings.fieldRequired)));
       return;
     }
 
@@ -105,29 +100,37 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
 
     try {
       if (_item != null) {
-        await repo.update(_item!.copyWith(
-          nameGu: name,
-          categoryId: _categoryId,
-          barcode: _barcodeController.text.trim().isEmpty ? null : _barcodeController.text.trim(),
-          unit: _unit,
-          salePrice: salePrice,
-          purchasePrice: purchasePrice,
-          currentStock: stock,
-          lowStockThreshold: lowStock,
-          isActive: _isActive,
-        ));
+        await repo.update(
+          _item!.copyWith(
+            nameGu: name,
+            categoryId: _categoryId,
+            barcode: _barcodeController.text.trim().isEmpty
+                ? null
+                : _barcodeController.text.trim(),
+            unit: _unit,
+            salePrice: salePrice,
+            purchasePrice: purchasePrice,
+            currentStock: stock,
+            lowStockThreshold: lowStock,
+            isActive: _isActive,
+          ),
+        );
       } else {
-        await repo.insert(Item(
-          nameGu: name,
-          categoryId: _categoryId,
-          barcode: _barcodeController.text.trim().isEmpty ? null : _barcodeController.text.trim(),
-          unit: _unit,
-          salePrice: salePrice,
-          purchasePrice: purchasePrice,
-          currentStock: stock,
-          lowStockThreshold: lowStock,
-          isActive: _isActive,
-        ));
+        await repo.insert(
+          Item(
+            nameGu: name,
+            categoryId: _categoryId,
+            barcode: _barcodeController.text.trim().isEmpty
+                ? null
+                : _barcodeController.text.trim(),
+            unit: _unit,
+            salePrice: salePrice,
+            purchasePrice: purchasePrice,
+            currentStock: stock,
+            lowStockThreshold: lowStock,
+            isActive: _isActive,
+          ),
+        );
       }
       ref.invalidate(itemListProvider);
       if (mounted) {
@@ -185,14 +188,14 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.itemId != null ? AppStrings.editItem : AppStrings.addItem),
+        title: Text(
+          widget.itemId != null ? AppStrings.editItem : AppStrings.addItem,
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -201,16 +204,12 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: AppStrings.itemName,
-              ),
+              decoration: const InputDecoration(labelText: AppStrings.itemName),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _barcodeController,
-              decoration: const InputDecoration(
-                labelText: AppStrings.barcode,
-              ),
+              decoration: const InputDecoration(labelText: AppStrings.barcode),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
@@ -218,12 +217,16 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
               decoration: const InputDecoration(labelText: AppStrings.category),
               items: [
                 const DropdownMenuItem(value: null, child: Text('—')),
-                ...ref.watch(categoryListProvider).when(
+                ...ref
+                    .watch(categoryListProvider)
+                    .when(
                       data: (cats) => cats
-                          .map((c) => DropdownMenuItem<int?>(
-                                value: c.id,
-                                child: Text(c.nameGu),
-                              ))
+                          .map(
+                            (c) => DropdownMenuItem<int?>(
+                              value: c.id,
+                              child: Text(c.nameGu),
+                            ),
+                          )
                           .toList(),
                       loading: () => [],
                       error: (e, st) => [],
@@ -235,33 +238,52 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
             DropdownButtonFormField<String>(
               initialValue: _unit,
               decoration: const InputDecoration(labelText: AppStrings.unit),
-              items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+              items: _units
+                  .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                  .toList(),
               onChanged: (v) => setState(() => _unit = v ?? _unit),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              title: Text(AppStrings.sellPrice),
-              subtitle: Text(_salePriceController.text),
-              trailing: const Icon(Icons.edit),
-              onTap: () => _showNumpad(_salePriceController, AppStrings.sellPrice),
+            TextField(
+              controller: _salePriceController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: AppStrings.sellPrice,
+                prefixText: '₹ ',
+              ),
             ),
-            ListTile(
-              title: Text(AppStrings.buyPrice),
-              subtitle: Text(_purchasePriceController.text),
-              trailing: const Icon(Icons.edit),
-              onTap: () => _showNumpad(_purchasePriceController, AppStrings.buyPrice),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _purchasePriceController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: AppStrings.buyPrice,
+                prefixText: '₹ ',
+              ),
             ),
-            ListTile(
-              title: Text(AppStrings.currentStock),
-              subtitle: Text(_stockController.text),
-              trailing: const Icon(Icons.edit),
-              onTap: () => _showNumpad(_stockController, AppStrings.currentStock),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _stockController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: AppStrings.currentStock,
+              ),
             ),
-            ListTile(
-              title: Text(AppStrings.lowStockThreshold),
-              subtitle: Text(_lowStockController.text),
-              trailing: const Icon(Icons.edit),
-              onTap: () => _showNumpad(_lowStockController, AppStrings.lowStockThreshold),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _lowStockController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: AppStrings.lowStockThreshold,
+              ),
             ),
             SwitchListTile(
               title: const Text(AppStrings.activeToggle),

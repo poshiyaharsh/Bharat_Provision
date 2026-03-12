@@ -1,16 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/models/product_model.dart';
+import '../../data/models/item.dart';
+import '../../data/providers.dart';
+
+// Billing search provider
+final billingSearchProvider = StateProvider<String>((ref) => '');
+
+// Items provider for billing - fetches from the same items table as inventory
+final billingItemsProvider = FutureProvider<List<Item>>((ref) async {
+  final repo = await ref.watch(itemRepositoryFutureProvider.future);
+  final query = ref.watch(billingSearchProvider);
+
+  if (query.isEmpty) {
+    return repo.getAll();
+  }
+
+  return repo.search(query, lowStockOnly: false);
+});
 
 /// Single line in a bill draft.
 class BillLine {
-  BillLine({
-    required this.product,
-    required this.qtyGrams,
-    required this.amount,
-  });
+  BillLine({required this.item, required this.qtyGrams, required this.amount});
 
-  final Product product;
+  final Item item;
 
   /// Stored in grams for weight-based units, or as "units" for count / litre.
   final double qtyGrams;
@@ -50,25 +62,21 @@ class BillDraft {
     );
   }
 
-  bool get isEmpty => lines.isEmpty && discountAmount == 0 && customerId == null;
+  bool get isEmpty =>
+      lines.isEmpty && discountAmount == 0 && customerId == null;
 }
 
 /// Overall billing tabs state – holds five independent drafts.
 class BillingTabsState {
-  BillingTabsState({
-    required this.activeIndex,
-    required this.drafts,
-  }) : assert(drafts.length == 5, 'Must always maintain 5 bill drafts');
+  BillingTabsState({required this.activeIndex, required this.drafts})
+    : assert(drafts.length == 5, 'Must always maintain 5 bill drafts');
 
   final int activeIndex;
   final List<BillDraft> drafts;
 
   BillDraft get activeDraft => drafts[activeIndex];
 
-  BillingTabsState copyWith({
-    int? activeIndex,
-    List<BillDraft>? drafts,
-  }) {
+  BillingTabsState copyWith({int? activeIndex, List<BillDraft>? drafts}) {
     return BillingTabsState(
       activeIndex: activeIndex ?? this.activeIndex,
       drafts: drafts ?? this.drafts,
@@ -78,12 +86,12 @@ class BillingTabsState {
 
 class BillingTabsNotifier extends StateNotifier<BillingTabsState> {
   BillingTabsNotifier()
-      : super(
-          BillingTabsState(
-            activeIndex: 0,
-            drafts: List<BillDraft>.generate(5, (_) => BillDraft()),
-          ),
-        );
+    : super(
+        BillingTabsState(
+          activeIndex: 0,
+          drafts: List<BillDraft>.generate(5, (_) => BillDraft()),
+        ),
+      );
 
   void switchToTab(int index) {
     if (index < 0 || index >= state.drafts.length) return;
@@ -93,7 +101,9 @@ class BillingTabsNotifier extends StateNotifier<BillingTabsState> {
   void addLineToActive(BillLine line) {
     final drafts = [...state.drafts];
     final current = drafts[state.activeIndex];
-    drafts[state.activeIndex] = current.copyWith(lines: [...current.lines, line]);
+    drafts[state.activeIndex] = current.copyWith(
+      lines: [...current.lines, line],
+    );
     state = state.copyWith(drafts: drafts);
   }
 
@@ -128,8 +138,10 @@ class BillingTabsNotifier extends StateNotifier<BillingTabsState> {
   }) {
     final drafts = [...state.drafts];
     final current = drafts[state.activeIndex];
-    drafts[state.activeIndex] =
-        current.copyWith(customerId: customerId, customerName: customerName);
+    drafts[state.activeIndex] = current.copyWith(
+      customerId: customerId,
+      customerName: customerName,
+    );
     state = state.copyWith(drafts: drafts);
   }
 
@@ -152,6 +164,5 @@ class BillingTabsNotifier extends StateNotifier<BillingTabsState> {
 /// Riverpod provider exposing the billing tabs state.
 final billingTabsProvider =
     StateNotifierProvider<BillingTabsNotifier, BillingTabsState>((ref) {
-  return BillingTabsNotifier();
-});
-
+      return BillingTabsNotifier();
+    });

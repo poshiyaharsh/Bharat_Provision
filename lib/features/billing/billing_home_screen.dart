@@ -5,8 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_strings.dart' as strings;
 import '../../core/utils/currency_format.dart';
 import '../../core/utils/weight_calculator.dart';
-import '../../shared/models/product_model.dart';
-import '../../shared/providers/product_provider.dart';
+import '../../data/models/item.dart';
 import 'billing_providers.dart';
 
 /// Simplified single-screen billing - Create bills and print them.
@@ -23,6 +22,16 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   double _discount = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Load all items when screen loads (from inventory items table)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(billingSearchProvider.notifier).state = '';
+      ref.invalidate(billingItemsProvider);
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -31,49 +40,53 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   double get _subtotal => _billLines.fold(0, (sum, line) => sum + line.amount);
   double get _total => _subtotal - _discount;
 
-  void _addProductToBill(Product product) async {
-    double amountPaid = product.sellPrice;
+  void _addProductToBill(Item item) async {
+    double amountPaid = item.salePrice;
     double weightGrams = 1000;
     String mode = 'amount';
+    bool itemAdded = false;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (ctx, setState) {
+          builder: (ctx, setDialogState) {
             double? calculatedWeight;
             double? calculatedAmount;
 
             if (mode == 'amount') {
               calculatedWeight = WeightCalculator.calculateWeightFromAmount(
                 amountPaid: amountPaid,
-                sellPricePerKg: product.sellPrice,
+                sellPricePerKg: item.salePrice,
               );
             } else {
               calculatedAmount = WeightCalculator.calculateAmountFromWeight(
                 weightGrams: weightGrams,
-                sellPricePerKg: product.sellPrice,
+                sellPricePerKg: item.salePrice,
               );
             }
 
             return AlertDialog(
-              title: Text(product.nameGujarati),
+              title: Text(item.nameGu),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
                     children: [
                       ChoiceChip(
                         label: const Text('₹ રૂપિયાથી'),
                         selected: mode == 'amount',
-                        onSelected: (_) => setState(() => mode = 'amount'),
+                        onSelected: (_) =>
+                            setDialogState(() => mode = 'amount'),
                       ),
-                      const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('⚖ વજનથી'),
                         selected: mode == 'weight',
-                        onSelected: (_) => setState(() => mode = 'weight'),
+                        onSelected: (_) =>
+                            setDialogState(() => mode = 'weight'),
                       ),
                     ],
                   ),
@@ -88,7 +101,8 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                       ),
                       onChanged: (v) {
                         final parsed = double.tryParse(v);
-                        if (parsed != null) setState(() => amountPaid = parsed);
+                        if (parsed != null)
+                          setDialogState(() => amountPaid = parsed);
                       },
                     ),
                     const SizedBox(height: 8),
@@ -112,7 +126,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                       onChanged: (v) {
                         final parsed = double.tryParse(v);
                         if (parsed != null)
-                          setState(() => weightGrams = parsed);
+                          setDialogState(() => weightGrams = parsed);
                       },
                     ),
                     const SizedBox(height: 8),
@@ -139,25 +153,24 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                     if (mode == 'amount') {
                       finalQty = WeightCalculator.calculateWeightFromAmount(
                         amountPaid: amountPaid,
-                        sellPricePerKg: product.sellPrice,
+                        sellPricePerKg: item.salePrice,
                       );
                       finalAmount = amountPaid;
                     } else {
                       finalAmount = WeightCalculator.calculateAmountFromWeight(
                         weightGrams: weightGrams,
-                        sellPricePerKg: product.sellPrice,
+                        sellPricePerKg: item.salePrice,
                       );
                       finalQty = weightGrams;
                     }
-                    setState(() {
-                      _billLines.add(
-                        BillLineItem(
-                          product: product,
-                          qtyGrams: finalQty,
-                          amount: finalAmount,
-                        ),
-                      );
-                    });
+                    _billLines.add(
+                      BillLineItem(
+                        item: item,
+                        qtyGrams: finalQty,
+                        amount: finalAmount,
+                      ),
+                    );
+                    itemAdded = true;
                     Navigator.of(ctx).pop();
                   },
                   child: const Text(strings.AppStrings.addButton),
@@ -168,6 +181,11 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
         );
       },
     );
+
+    // Trigger parent widget rebuild after dialog closes
+    if (itemAdded && mounted) {
+      setState(() {});
+    }
   }
 
   void _removeLine(int index) {
@@ -251,7 +269,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
     buffer.writeln('            બિલ');
     buffer.writeln('===============================\n');
     for (var line in _billLines) {
-      buffer.writeln('${line.product.nameGujarati}');
+      buffer.writeln('${line.item.nameGu}');
       buffer.writeln(
         '  ${WeightCalculator.formatWeight(line.qtyGrams)}  ${formatCurrency(line.amount)}',
       );
@@ -305,7 +323,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   }
 
   Widget _buildProductPanel() {
-    final state = ref.watch(productProvider);
+    final state = ref.watch(billingItemsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -319,31 +337,62 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
               border: OutlineInputBorder(),
             ),
             onChanged: (value) {
-              if (value.trim().isEmpty) {
-                ref.read(productProvider.notifier).loadAllProducts();
-              } else {
-                ref.read(productProvider.notifier).searchProducts(value);
-              }
+              ref.read(billingSearchProvider.notifier).state = value;
             },
           ),
         ),
         Expanded(
           child: state.when(
-            data: (products) {
-              if (products.isEmpty) {
-                return const Center(
-                  child: Text(strings.AppStrings.noProductsFound),
+            data: (items) {
+              if (items.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.inventory_2_outlined,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'કોઈ ઉત્પાદન મળ્યું નહીં',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _searchController.text.isEmpty
+                            ? 'ઉત્પાદન ઉમેરવા માટે ઇન્વેન્ટરીમાં જાઓ'
+                            : '"${_searchController.text}" માટે કોઈ ઉત્પાદન નથી',
+                        style: const TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('પુનરાવર્તમાન કરો'),
+                        onPressed: () {
+                          ref.read(billingSearchProvider.notifier).state = '';
+                          _searchController.clear();
+                          ref.invalidate(billingItemsProvider);
+                        },
+                      ),
+                    ],
+                  ),
                 );
               }
               return ListView.builder(
-                itemCount: products.length,
+                itemCount: items.length,
                 itemBuilder: (ctx, i) {
-                  final p = products[i];
+                  final item = items[i];
                   return ListTile(
                     leading: const Icon(Icons.inventory_2),
-                    title: Text(p.nameGujarati),
-                    subtitle: Text('₹${p.sellPrice.toStringAsFixed(2)}'),
-                    onTap: () => _addProductToBill(p),
+                    title: Text(item.nameGu),
+                    subtitle: Text('₹${item.salePrice.toStringAsFixed(2)}'),
+                    onTap: () => _addProductToBill(item),
                   );
                 },
               );
@@ -370,7 +419,30 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
         ),
         const Divider(height: 1),
         if (_billLines.isEmpty)
-          const Expanded(child: Center(child: Text('કોઇ આઇટમ નહીં')))
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'બિલ ખાલી છે',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'ડાબી બાજુથી ઉત્પાદન પસંદ કરો',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          )
         else
           Expanded(
             child: ListView.builder(
@@ -388,7 +460,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                   ),
                   onDismissed: (_) => _removeLine(i),
                   child: ListTile(
-                    title: Text(line.product.nameGujarati),
+                    title: Text(line.item.nameGu),
                     subtitle: Text(
                       WeightCalculator.formatWeight(line.qtyGrams),
                     ),
@@ -479,12 +551,12 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
 
 /// Simple bill line item model.
 class BillLineItem {
-  final Product product;
+  final Item item;
   final double qtyGrams;
   final double amount;
 
   BillLineItem({
-    required this.product,
+    required this.item,
     required this.qtyGrams,
     required this.amount,
   });
