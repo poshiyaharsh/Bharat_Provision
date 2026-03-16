@@ -7,6 +7,8 @@ import '../../core/utils/currency_format.dart';
 import '../../core/utils/weight_calculator.dart';
 import '../../data/models/item.dart';
 import 'billing_providers.dart';
+import '../../core/services/notification_service.dart';
+import '../../features/stock/stock_providers.dart';
 
 /// Simplified single-screen billing - Create bills and print them.
 class BillingHomeScreen extends ConsumerStatefulWidget {
@@ -20,6 +22,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   final _searchController = TextEditingController();
   List<BillLineItem> _billLines = [];
   double _discount = 0;
+  String? _bannerMessage;
 
   @override
   void initState() {
@@ -40,7 +43,59 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   double get _subtotal => _billLines.fold(0, (sum, line) => sum + line.amount);
   double get _total => _subtotal - _discount;
 
+  Future<void> _saveBill() async {
+    // Save bill logic (not shown here)
+    // After saving, check stock alerts for all products in bill
+    final productIds = _billLines.map((l) => l.item.id).whereType<int>().toList();
+    final stockRepo = ref.read(stockRepositoryProvider);
+    final alertResult = await stockRepo.checkStockAlerts(productIds);
+    final userRole = await _getCurrentUserRole();
+
+    if (alertResult.lowStock.isNotEmpty || alertResult.outOfStock.isNotEmpty) {
+      final names = [
+        ...alertResult.lowStock.map((p) => p.nameGujarati),
+        ...alertResult.outOfStock.map((p) => p.nameGujarati),
+      ].join(', ');
+      if (userRole == 'employee') {
+        setState(() {
+          _bannerMessage = 'સ્ટોક ઓછો/ખૂટ્યો: $names';
+        });
+      } else {
+        setState(() {
+          _bannerMessage = 'સ્ટોક ઓછો/ખૂટ્યો: $names';
+        });
+        for (final p in alertResult.lowStock) {
+          await NotificationService.instance.showLowStockAlert(
+            productName: p.nameGujarati,
+            qty: p.stockQty,
+          );
+        }
+        for (final p in alertResult.outOfStock) {
+          await NotificationService.instance.showOutOfStockAlert(
+            productName: p.nameGujarati,
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _bannerMessage = null;
+      });
+    }
+  }
+
+  Future<String> _getCurrentUserRole() async {
+    // Replace with actual user role fetch logic
+    // For demo, return 'admin'
+    return 'admin';
+  }
+
   void _addProductToBill(Item item) async {
+    if (item.currentStock <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('સ્ટોક ઉપલબ્ધ નથી')), // Gujarati message
+      );
+      return;
+    }
     double amountPaid = item.salePrice;
     double weightGrams = 1000;
     String mode = 'amount';
@@ -292,13 +347,41 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
         title: const Text(strings.AppStrings.billingTitle),
         actions: [
           IconButton(
+            icon: const Icon(Icons.save),
+            onPressed: _saveBill,
+            tooltip: 'બિલ સાચવો',
+          ),
+          IconButton(
             icon: const Icon(Icons.print),
             onPressed: _printBill,
             tooltip: 'બિલ છાપો',
           ),
         ],
       ),
-      body: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
+      body: Column(
+        children: [
+          if (_bannerMessage != null)
+            Container(
+              color: Colors.red.shade100,
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _bannerMessage!,
+                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: isMobile ? _buildMobileLayout() : _buildDesktopLayout(),
+          ),
+        ],
+      ),
     );
   }
 

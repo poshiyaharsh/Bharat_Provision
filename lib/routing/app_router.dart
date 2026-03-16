@@ -10,6 +10,10 @@ import '../features/khata/customer_khata_detail_screen.dart';
 import '../features/khata/customer_edit_screen.dart';
 import '../features/reports/reports_home_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/stock/stock_dashboard_screen.dart';
+import '../features/stock/add_stock_screen.dart';
+import '../features/stock/stock_history_screen.dart';
+import '../shared/models/product_model.dart';
 
 class AppRouter {
   AppRouter._();
@@ -25,6 +29,9 @@ class AppRouter {
   static const String customerAdd = '/khata/add';
   static const String customerEdit = '/khata/edit';
   static const String customerKhata = '/khata/detail';
+  static const String stockDashboard = '/stock';
+  static const String stockAdd = '/stock/add';
+  static const String stockHistory = '/stock/history';
 
   static const List<String> _mainRoutes = [billing, inventory, khata, reports, settings];
 
@@ -60,6 +67,25 @@ class AppRouter {
       case customerKhata:
         final id = routeSettings.arguments as int;
         return _build(CustomerKhataDetailScreen(customerId: id));
+      case stockDashboard:
+        return _buildShell(1, const StockDashboardScreen());
+      case stockAdd:
+        final product = routeSettings.arguments as Product?;
+        return _build(AddStockScreen(prefilledProduct: product));
+      case stockHistory:
+        final args = routeSettings.arguments as Map<String, dynamic>?;
+        final productId = args?['productId'] as int?;
+        final productName = args?['productName'] as String?;
+        if (productId != null && productName != null) {
+          return _build(StockHistoryScreen(productId: productId, productName: productName));
+        }
+        return _build(
+          Scaffold(
+            body: Center(
+              child: Text('Not found: ${routeSettings.name}'),
+            ),
+          ),
+        );
       default:
         return _build(
           Scaffold(
