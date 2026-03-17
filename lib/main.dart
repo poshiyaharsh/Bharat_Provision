@@ -15,6 +15,8 @@ import 'features/khata/customer_list_screen.dart';
 import 'features/reports/reports_home_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'routing/app_router.dart';
+import 'core/auth/role_provider.dart';
+import 'features/udhaar/udhaar_dashboard_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,11 +80,10 @@ class _MainShell extends ConsumerStatefulWidget {
   @override
   ConsumerState<_MainShell> createState() => _MainShellState();
 }
-
 class _MainShellState extends ConsumerState<_MainShell> {
   int _currentIndex = 0;
 
-  static const _screens = [
+  static const List<Widget> _baseScreens = [
     BillingHomeScreen(),
     ItemListScreen(),
     CustomerListScreen(),
@@ -92,12 +93,18 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final role = ref.watch(currentRoleProvider);
+    final isAdmin = canAccessUdhaar(role);
+    final Widget currentScreen;
+    if (_currentIndex == 5 && isAdmin) {
+      currentScreen = const UdhaarDashboardScreen();
+    } else {
+      currentScreen = _baseScreens[_currentIndex.clamp(0, 4)];
+    }
     return AppScaffold(
       currentIndex: _currentIndex,
-      onDestinationSelected: (i) {
-        setState(() => _currentIndex = i);
-      },
-      child: _screens[_currentIndex],
+      onDestinationSelected: (i) => setState(() => _currentIndex = i),
+      child: currentScreen,
     );
   }
 }

@@ -14,6 +14,10 @@ import '../features/stock/stock_dashboard_screen.dart';
 import '../features/stock/add_stock_screen.dart';
 import '../features/stock/stock_history_screen.dart';
 import '../shared/models/product_model.dart';
+import '../features/udhaar/udhaar_dashboard_screen.dart';
+import '../features/udhaar/customer_ledger_screen.dart';
+import '../features/udhaar/collect_payment_screen.dart';
+import '../features/udhaar/final_total_screen.dart';
 
 class AppRouter {
   AppRouter._();
@@ -32,8 +36,19 @@ class AppRouter {
   static const String stockDashboard = '/stock';
   static const String stockAdd = '/stock/add';
   static const String stockHistory = '/stock/history';
+  static const String udhaarDashboard = '/udhaar';
+  static const String udhaarCustomer = '/udhaar/customer';
+  static const String udhaarCollect = '/udhaar/collect';
+  static const String udhaarFinal = '/udhaar/final';
 
-  static const List<String> _mainRoutes = [billing, inventory, khata, reports, settings];
+  static const List<String> _mainRoutes = [
+    billing,
+    inventory,
+    khata,
+    reports,
+    settings,
+    udhaarDashboard,
+  ];
 
   static int indexForRoute(String route) {
     final i = _mainRoutes.indexOf(route);
@@ -86,6 +101,17 @@ class AppRouter {
             ),
           ),
         );
+      case udhaarDashboard:
+        return _buildShell(5, const UdhaarDashboardScreen());
+      case udhaarCustomer:
+        final customerId = routeSettings.arguments as int;
+        return _build(CustomerLedgerScreen(customerId: customerId));
+      case udhaarCollect:
+        final customerId = routeSettings.arguments as int;
+        return _build(CollectPaymentScreen(customerId: customerId));
+      case udhaarFinal:
+        final customerId = routeSettings.arguments as int;
+        return _build(FinalTotalScreen(customerId: customerId));
       default:
         return _build(
           Scaffold(
