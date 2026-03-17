@@ -8,6 +8,7 @@ import '../features/inventory/item_edit_screen.dart';
 import '../features/khata/customer_list_screen.dart';
 import '../features/khata/customer_khata_detail_screen.dart';
 import '../features/khata/customer_edit_screen.dart';
+import '../features/khata/khata_screen.dart';
 import '../features/reports/reports_home_screen.dart';
 import '../features/returns/return_history_screen.dart';
 import '../features/returns/return_screen.dart';
@@ -21,12 +22,20 @@ import '../features/udhaar/udhaar_dashboard_screen.dart';
 import '../features/udhaar/customer_ledger_screen.dart';
 import '../features/udhaar/collect_payment_screen.dart';
 import '../features/udhaar/final_total_screen.dart';
+import '../features/dashboard/dashboard_screen.dart';
+import '../features/reports/pl_report_screen.dart';
+import '../features/reports/daily_report_screen.dart';
+import '../features/khata/khata_screen.dart';
+import '../features/expenses/add_expense_screen.dart';
+import '../features/expenses/expense_list_screen.dart';
 
 class AppRouter {
   AppRouter._();
 
-  static const String billing = '/';
+  static const String billing = '/billing';
+  static const String dashboard = '/';
   static const String inventory = '/inventory';
+  static const String customers = '/customers';
   static const String khata = '/khata';
   static const String reports = '/reports';
   static const String settings = '/settings';
@@ -46,11 +55,15 @@ class AppRouter {
   static const String udhaarCustomer = '/udhaar/customer';
   static const String udhaarCollect = '/udhaar/collect';
   static const String udhaarFinal = '/udhaar/final';
+  static const String plReport = '/reports/pl';
+  static const String dailyReport = '/reports/daily';
+  static const String addExpense = '/expenses/add';
+  static const String expenseList = '/expenses';
 
   static const List<String> _mainRoutes = [
-    billing,
+    dashboard,
     inventory,
-    khata,
+    customers,
     reports,
     settings,
     udhaarDashboard,
@@ -63,12 +76,19 @@ class AppRouter {
 
   static Route<dynamic> onGenerateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
+      case dashboard:
+        return _buildShell(0, const DashboardScreen());
       case billing:
-        return _buildShell(0, const BillingHomeScreen());
+        return _build(const BillingHomeScreen());
       case inventory:
         return _buildShell(1, const ItemListScreen());
-      case khata:
+      case customers:
         return _buildShell(2, const CustomerListScreen());
+      case khata:
+        return _buildShell(
+          2,
+          const KhataScreen(),
+        ); // same index? Wait, perhaps change index.
       case reports:
         return _buildShell(3, const ReportsHomeScreen());
       case settings:
@@ -124,6 +144,16 @@ class AppRouter {
       case udhaarFinal:
         final customerId = routeSettings.arguments as int;
         return _build(FinalTotalScreen(customerId: customerId));
+      case plReport:
+        return _build(const PLReportScreen());
+      case dailyReport:
+        return _build(const DailyReportScreen());
+      case khata:
+        return _build(const KhataScreen());
+      case addExpense:
+        return _build(const AddExpenseScreen());
+      case expenseList:
+        return _build(const ExpenseListScreen());
       default:
         return _build(
           Scaffold(

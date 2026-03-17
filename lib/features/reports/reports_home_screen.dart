@@ -98,12 +98,24 @@ class ReportsHomeScreen extends ConsumerWidget {
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pushNamed('/plReport'),
+                    child: const Text('P&L Report'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pushNamed('/dailyReport'),
+                    child: const Text('Daily Report'),
+                  ),
+                ),
+              ],
+            ),
 
 class _SalesCard extends ConsumerWidget {
   const _SalesCard({
