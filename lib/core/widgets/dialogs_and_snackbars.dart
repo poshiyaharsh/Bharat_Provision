@@ -10,8 +10,8 @@ class LoadingDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async => dismissible,
+    return PopScope(
+      canPop: dismissible,
       child: Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,

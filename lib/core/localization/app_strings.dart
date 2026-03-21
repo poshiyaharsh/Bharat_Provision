@@ -186,7 +186,7 @@ class AppStrings {
   // UX Polish - Forms
   static const String namePlaceholder = 'નામ દાખલ કરો';
   static const String searchPlaceholder = 'શોધો...';
-  static const String translit_hint =
+  static const String translitHint =
       'ધ્વનિશાસ્ત્ર: marchu, chaval, tel, atta...';
 
   // Printer & Printing

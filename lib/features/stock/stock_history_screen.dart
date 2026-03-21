@@ -6,7 +6,11 @@ import '../../shared/models/stock_log_model.dart';
 import 'stock_providers.dart';
 
 class StockHistoryScreen extends ConsumerWidget {
-  const StockHistoryScreen({super.key, required this.productId, required this.productName});
+  const StockHistoryScreen({
+    super.key,
+    required this.productId,
+    required this.productName,
+  });
   final int productId;
   final String productName;
 
@@ -63,7 +67,7 @@ class _StockHistoryRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: bgColor.withOpacity(0.4)),
+        border: Border.all(color: bgColor.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [

@@ -12,7 +12,8 @@ class StockDashboardScreen extends ConsumerStatefulWidget {
   const StockDashboardScreen({super.key});
 
   @override
-  ConsumerState<StockDashboardScreen> createState() => _StockDashboardScreenState();
+  ConsumerState<StockDashboardScreen> createState() =>
+      _StockDashboardScreenState();
 }
 
 class _StockDashboardScreenState extends ConsumerState<StockDashboardScreen> {
@@ -51,7 +52,10 @@ class _StockDashboardScreenState extends ConsumerState<StockDashboardScreen> {
           // ── Summary row ────────────────────────────────────────────────
           summaryAsync.when(
             data: (s) => _SummaryRow(summary: s),
-            loading: () => const SizedBox(height: 56, child: Center(child: LinearProgressIndicator())),
+            loading: () => const SizedBox(
+              height: 56,
+              child: Center(child: LinearProgressIndicator()),
+            ),
             error: (_, _) => const SizedBox.shrink(),
           ),
 
@@ -99,7 +103,8 @@ class _StockDashboardScreenState extends ConsumerState<StockDashboardScreen> {
                       label: Text(labels[f]!),
                       selected: statusFilter == f,
                       onSelected: (_) =>
-                          ref.read(stockStatusFilterProvider.notifier).state = f,
+                          ref.read(stockStatusFilterProvider.notifier).state =
+                              f,
                     ),
                   );
                 }).toList(),
@@ -122,21 +127,29 @@ class _StockDashboardScreenState extends ConsumerState<StockDashboardScreen> {
                         child: FilterChip(
                           label: const Text('બધી કેટેગરી'),
                           selected: categoryFilter == null,
-                          onSelected: (_) => ref
-                              .read(stockCategoryFilterProvider.notifier)
-                              .state = null,
+                          onSelected: (_) =>
+                              ref
+                                      .read(
+                                        stockCategoryFilterProvider.notifier,
+                                      )
+                                      .state =
+                                  null,
                         ),
                       ),
-                      ...cats.map((c) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(c.name),
-                              selected: categoryFilter == c.id,
-                              onSelected: (_) => ref
-                                  .read(stockCategoryFilterProvider.notifier)
-                                  .state = c.id,
-                            ),
-                          )),
+                      ...cats.map(
+                        (c) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(c.name),
+                            selected: categoryFilter == c.id,
+                            onSelected: (_) =>
+                                ref
+                                    .read(stockCategoryFilterProvider.notifier)
+                                    .state = c
+                                    .id,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -152,7 +165,11 @@ class _StockDashboardScreenState extends ConsumerState<StockDashboardScreen> {
           Expanded(
             child: productsAsync.when(
               data: (products) {
-                final filtered = _applyFilters(products, statusFilter, categoryFilter);
+                final filtered = _applyFilters(
+                  products,
+                  statusFilter,
+                  categoryFilter,
+                );
                 if (filtered.isEmpty) {
                   return const Center(
                     child: Text(
@@ -219,7 +236,10 @@ class _StockDashboardScreenState extends ConsumerState<StockDashboardScreen> {
   void _openHistory(Product product) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => StockHistoryScreen(productId: product.id!, productName: product.nameGujarati),
+        builder: (_) => StockHistoryScreen(
+          productId: product.id!,
+          productName: product.nameGujarati,
+        ),
       ),
     );
   }
@@ -276,9 +296,9 @@ class _SummaryChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.4)),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -291,10 +311,7 @@ class _SummaryChip extends StatelessWidget {
               color: color,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(fontSize: 11, color: color),
-          ),
+          Text(label, style: TextStyle(fontSize: 11, color: color)),
         ],
       ),
     );
@@ -327,10 +344,7 @@ class _ProductStockTile extends StatelessWidget {
         leading: Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: dotColor,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
         ),
         title: Text(
           product.nameGujarati,
@@ -376,8 +390,10 @@ class _ProductStockTile extends StatelessWidget {
               icon: const Icon(Icons.add, size: 16),
               label: const Text('ઉમેરો'),
               style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 textStyle: const TextStyle(fontSize: 12),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,

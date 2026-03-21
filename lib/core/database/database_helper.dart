@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite_common/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' as sqflite_ffi;
 import 'package:sqflite_sqlcipher/sqflite.dart' as sqlcipher;
 
@@ -17,10 +18,10 @@ class DatabaseHelper {
   static const int schemaVersion = 1;
   static const String dbFileName = 'kirana.db';
 
-  dynamic _db;
+  Database? _db;
   String? _password;
 
-  Future<dynamic> get database async {
+  Future<Database> get database async {
     if (_db != null) return _db!;
     try {
       _db = await _openEncrypted();
@@ -41,7 +42,7 @@ class DatabaseHelper {
     }
   }
 
-  Future<dynamic> _openEncrypted() async {
+  Future<Database> _openEncrypted() async {
     try {
       // On Android/iOS, use sqlcipher plugin with password.
       if (Platform.isAndroid || Platform.isIOS) {

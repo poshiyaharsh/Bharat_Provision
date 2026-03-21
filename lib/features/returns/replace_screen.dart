@@ -238,6 +238,7 @@ class _ReplaceScreenState extends ConsumerState<ReplaceScreen> {
         notes:
             'Replace: ${_selectedReturnItem!.productNameSnapshot} → ${_selectedReplacementProduct!.nameGujarati}',
       );
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('બદલી સફળતાપૂર્વક થઈ')));

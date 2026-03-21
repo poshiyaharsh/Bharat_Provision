@@ -35,8 +35,8 @@ class KeyboardShortcutsHandler {
   });
 
   /// Handle key press events
-  bool handleKeyPress(RawKeyEvent event) {
-    if (event is! RawKeyDownEvent) return false;
+  bool handleKeyPress(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
 
     // Check for F1-F7
     if (event.logicalKey == LogicalKeyboardKey.f1) {
@@ -69,7 +69,7 @@ class KeyboardShortcutsHandler {
     }
 
     // Check for Ctrl combinations
-    if (event.isControlPressed) {
+    if (HardwareKeyboard.instance.isControlPressed) {
       if (event.logicalKey == LogicalKeyboardKey.keyP) {
         onCtrlP?.call();
         return true;

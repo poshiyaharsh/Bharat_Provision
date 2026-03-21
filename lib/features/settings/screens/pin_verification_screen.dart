@@ -36,6 +36,7 @@ class _PinVerificationScreenState extends ConsumerState<PinVerificationScreen> {
     final pinStorage = ref.read(pinStorageProvider);
     final isValid = await pinStorage.verifyPin(session.role, _enteredPin);
 
+    if (!mounted) return;
     if (isValid) {
       widget.onVerified(true);
       Navigator.of(context).pop(true);

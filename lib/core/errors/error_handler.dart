@@ -73,7 +73,7 @@ class ErrorHandler {
         return 'STORE_001';
       }
 
-      if (error is IntegerDivisionByZeroException) {
+      if (error is UnsupportedError) {
         return 'CALC_001';
       }
 

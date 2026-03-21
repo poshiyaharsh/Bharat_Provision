@@ -18,8 +18,7 @@ class UdhaarDashboardScreen extends ConsumerStatefulWidget {
       _UdhaarDashboardScreenState();
 }
 
-class _UdhaarDashboardScreenState
-    extends ConsumerState<UdhaarDashboardScreen> {
+class _UdhaarDashboardScreenState extends ConsumerState<UdhaarDashboardScreen> {
   Color _daysColor(int days) {
     if (days <= 0) return AppColors.success;
     if (days <= 15) return AppColors.success;
@@ -41,10 +40,9 @@ class _UdhaarDashboardScreenState
               const SizedBox(height: 16),
               Text(
                 'ઉધાર ફક્ત Admin / Superadmin માટે',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(color: AppColors.alert),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(color: AppColors.alert),
               ),
             ],
           ),
@@ -75,8 +73,9 @@ class _UdhaarDashboardScreenState
           totalAsync.when(
             data: (total) => _TotalCard(total: total),
             loading: () => const SizedBox(
-                height: 80,
-                child: Center(child: LinearProgressIndicator())),
+              height: 80,
+              child: Center(child: LinearProgressIndicator()),
+            ),
             error: (_, _) => const SizedBox.shrink(),
           ),
           // ── Customer list ───────────────────────────────────────────────
@@ -105,8 +104,7 @@ class _UdhaarDashboardScreenState
                         );
                       },
                     ),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('ભૂલ: $e')),
             ),
           ),
@@ -125,7 +123,8 @@ class _UdhaarDashboardScreenState
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) => ReminderBottomSheet(customer: customer),
     );
   }
@@ -148,42 +147,46 @@ class _UdhaarDashboardScreenState
                   controller: nameCtrl,
                   autofocus: true,
                   decoration: const InputDecoration(
-                      labelText: 'ગ્રાહકનું નામ (ગુજ.) *'),
+                    labelText: 'ગ્રાહકનું નામ (ગુજ.) *',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                      labelText: 'ફોન નંબર (વૈકલ્પિક)'),
+                    labelText: 'ફોન નંબર (વૈકલ્પિક)',
+                  ),
                 ),
                 const SizedBox(height: 8),
+                // ignore: deprecated_member_use
                 RadioListTile<String>(
                   dense: true,
                   title: const Text('નિયમિત ગ્રાહક'),
                   value: 'regular',
                   groupValue: accountType,
-                  onChanged: (v) =>
-                      setDlgState(() => accountType = v!),
+                  onChanged: (v) => setDlgState(() => accountType = v!),
                 ),
+                // ignore: deprecated_member_use
                 RadioListTile<String>(
                   dense: true,
                   title: const Text('👤 વૉક-ઇન ગ્રાહક (નવો)'),
                   value: 'walkin',
                   groupValue: accountType,
-                  onChanged: (v) =>
-                      setDlgState(() => accountType = v!),
+                  onChanged: (v) => setDlgState(() => accountType = v!),
                 ),
               ],
             ),
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('રદ')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('રદ'),
+            ),
             ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('ઉમેરો')),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('ઉમેરો'),
+            ),
           ],
         ),
       ),
@@ -209,21 +212,27 @@ class _UdhaarDashboardScreenState
             children: [
               const Text('આ ગ્રાહક પહેલેથી હોઈ શકે:'),
               const SizedBox(height: 8),
-              ...similar.take(3).map((c) => ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.person),
-                    title: Text(c.nameGujarati),
-                    subtitle: Text(c.phone ?? ''),
-                  )),
+              ...similar
+                  .take(3)
+                  .map(
+                    (c) => ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.person),
+                      title: Text(c.nameGujarati),
+                      subtitle: Text(c.phone ?? ''),
+                    ),
+                  ),
             ],
           ),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('રદ')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('રદ'),
+            ),
             ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('છતાં ઉમેરો')),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('છતાં ઉમેરો'),
+            ),
           ],
         ),
       );
@@ -239,12 +248,14 @@ class _UdhaarDashboardScreenState
       ref.invalidate(udhaarCustomerListProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('ગ્રાહક સફળતાપૂર્વક ઉમેરાયો')));
+          const SnackBar(content: Text('ગ્રાહક સફળતાપૂર્વક ઉમેરાયો')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('ભૂલ: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('ભૂલ: $e')));
       }
     }
   }
@@ -272,18 +283,17 @@ class _TotalCard extends StatelessWidget {
         children: [
           Text(
             'કુલ બાકી ઉધાર',
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: AppColors.alert),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.alert),
           ),
           const SizedBox(height: 4),
           Text(
             formatCurrency(total),
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: AppColors.alert,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: AppColors.alert,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -323,10 +333,12 @@ class _CustomerTile extends StatelessWidget {
                 backgroundColor: c.totalOutstanding > 0
                     ? AppColors.alert.withValues(alpha: 0.15)
                     : AppColors.success.withValues(alpha: 0.15),
-                child: Icon(Icons.person,
-                    color: c.totalOutstanding > 0
-                        ? AppColors.alert
-                        : AppColors.success),
+                child: Icon(
+                  Icons.person,
+                  color: c.totalOutstanding > 0
+                      ? AppColors.alert
+                      : AppColors.success,
+                ),
               ),
               const SizedBox(width: 12),
               // Name + badges
@@ -339,9 +351,7 @@ class _CustomerTile extends StatelessWidget {
                         Flexible(
                           child: Text(
                             c.nameGujarati,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -350,7 +360,9 @@ class _CustomerTile extends StatelessWidget {
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.warning.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(6),
@@ -358,7 +370,9 @@ class _CustomerTile extends StatelessWidget {
                             child: Text(
                               '👤 નવો',
                               style: TextStyle(
-                                  fontSize: 11, color: AppColors.warning),
+                                fontSize: 11,
+                                color: AppColors.warning,
+                              ),
                             ),
                           ),
                         ],
@@ -368,9 +382,10 @@ class _CustomerTile extends StatelessWidget {
                       Text(
                         '${row.daysSinceOldestUnpaid} દિવ્સ',
                         style: TextStyle(
-                            fontSize: 12,
-                            color: daysColor,
-                            fontWeight: FontWeight.w500),
+                          fontSize: 12,
+                          color: daysColor,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                   ],
                 ),
@@ -382,11 +397,11 @@ class _CustomerTile extends StatelessWidget {
                   Text(
                     formatCurrency(c.totalOutstanding),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: c.totalOutstanding > 0
-                              ? AppColors.alert
-                              : AppColors.success,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: c.totalOutstanding > 0
+                          ? AppColors.alert
+                          : AppColors.success,
+                    ),
                   ),
                 ],
               ),

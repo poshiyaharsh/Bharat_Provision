@@ -140,12 +140,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildSummaryCard<T>(
     String title,
-    AlwaysAliveProviderBase<AsyncValue<T>> provider,
+    ProviderBase<AsyncValue<T>> provider,
     Color color, {
     String suffix = '',
   }) {
     return Card(
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

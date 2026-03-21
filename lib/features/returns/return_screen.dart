@@ -188,6 +188,7 @@ class _ReturnScreenState extends ConsumerState<ReturnScreen> {
         lines: lines,
         returnMode: mode,
       );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('રિફંડ સફળતાપૂર્વક લેવામાં આવ્યું')),
       );

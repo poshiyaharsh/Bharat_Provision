@@ -315,12 +315,14 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
           ],
         ),
       );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('બિલ તૈયાર! (Bluetooth print pending integration)'),
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('ભૂલ: $e')));

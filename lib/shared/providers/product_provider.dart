@@ -25,8 +25,7 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
                 'products',
                 where: 'is_active = 1',
                 orderBy: 'name_gujarati COLLATE NOCASE',
-              )
-              as List<Map<String, Object?>>;
+              );
       final products = rows
           .map<Product>((m) => Product.fromMap(m as Map<String, dynamic>))
           .toList();
@@ -161,8 +160,7 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
           )
       ''',
                 [like, like, like, like, like],
-              )
-              as List<Map<String, Object?>>;
+              );
 
       final products = rows
           .map<Product>((m) => Product.fromMap(m as Map<String, dynamic>))
@@ -207,8 +205,7 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
         SELECT * FROM products
         WHERE is_active = 1
           AND stock_qty <= min_stock_qty
-      ''')
-              as List<Map<String, Object?>>;
+      ''');
       return rows
           .map<Product>((m) => Product.fromMap(m as Map<String, dynamic>))
           .toList();

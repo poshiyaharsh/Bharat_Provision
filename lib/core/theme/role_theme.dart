@@ -63,7 +63,7 @@ class RoleThemeColors {
       ),
       colorScheme: ColorScheme.light(
         primary: primaryColor,
-        secondary: primaryColor.withOpacity(0.7),
+        secondary: primaryColor.withValues(alpha: 0.7),
         surface: Colors.white,
         error: Colors.red,
       ),
@@ -101,7 +101,8 @@ class RoleThemeColors {
 class RoleAwareAppBar extends AppBar {
   final String currentRole;
 
-  RoleAwareAppBar({super.key, 
+  RoleAwareAppBar({
+    super.key,
     required this.currentRole,
     required String titleText,
     super.actions,

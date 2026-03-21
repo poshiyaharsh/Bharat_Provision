@@ -47,9 +47,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
         children: [
           Row(
             children: [
-              Expanded(
-                child: _buildAccountDropdown(),
-              ),
+              Expanded(child: _buildAccountDropdown()),
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: _selectDateRange,
@@ -58,39 +56,46 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
             ],
           ),
           if (_startDate != null && _endDate != null)
-            Text('${_startDate!.toString().split(' ')[0]} - ${_endDate!.toString().split(' ')[0]}'),
+            Text(
+              '${_startDate!.toString().split(' ')[0]} - ${_endDate!.toString().split(' ')[0]}',
+            ),
         ],
       ),
     );
   }
 
   Widget _buildAccountDropdown() {
-    return ref.watch(expenseRepositoryProvider).when(
-      data: (repo) => FutureBuilder<List<ExpenseAccount>>(
-        future: repo.getExpenseAccounts(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SizedBox.shrink();
-          final accounts = snapshot.data!;
-          return DropdownButton<ExpenseAccount?>(
-            value: _selectedAccount,
-            hint: const Text('All Accounts'),
-            isExpanded: true,
-            items: [
-              const DropdownMenuItem(value: null, child: Text('All Accounts')),
-              ...accounts.map((account) {
-                return DropdownMenuItem(
-                  value: account,
-                  child: Text(account.accountNameGujarati),
-                );
-              }),
-            ],
-            onChanged: (value) => setState(() => _selectedAccount = value),
-          );
-        },
-      ),
-      error: (error, stack) => Text('Error: $error'),
-      loading: () => const CircularProgressIndicator(),
-    );
+    return ref
+        .watch(expenseRepositoryProvider)
+        .when(
+          data: (repo) => FutureBuilder<List<ExpenseAccount>>(
+            future: repo.getExpenseAccounts(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SizedBox.shrink();
+              final accounts = snapshot.data!;
+              return DropdownButton<ExpenseAccount?>(
+                value: _selectedAccount,
+                hint: const Text('All Accounts'),
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('All Accounts'),
+                  ),
+                  ...accounts.map((account) {
+                    return DropdownMenuItem(
+                      value: account,
+                      child: Text(account.accountNameGujarati),
+                    );
+                  }),
+                ],
+                onChanged: (value) => setState(() => _selectedAccount = value),
+              );
+            },
+          ),
+          error: (error, stack) => Text('Error: $error'),
+          loading: () => const CircularProgressIndicator(),
+        );
   }
 
   void _selectDateRange() async {
@@ -111,65 +116,69 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
   }
 
   Widget _buildExpenseList() {
-    return ref.watch(expenseRepositoryProvider).when(
-      data: (repo) => FutureBuilder<List<Expense>>(
-        future: repo.getExpenses(
-          startDate: _startDate,
-          endDate: _endDate,
-          accountId: _selectedAccount?.id,
-        ),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final expenses = snapshot.data!;
-          if (expenses.isEmpty) return const Center(child: Text('No expenses found'));
+    return ref
+        .watch(expenseRepositoryProvider)
+        .when(
+          data: (repo) => FutureBuilder<List<Expense>>(
+            future: repo.getExpenses(
+              startDate: _startDate,
+              endDate: _endDate,
+              accountId: _selectedAccount?.id,
+            ),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData)
+                return const Center(child: CircularProgressIndicator());
+              final expenses = snapshot.data!;
+              if (expenses.isEmpty)
+                return const Center(child: Text('No expenses found'));
 
-          // Group by date
-          final grouped = <String, List<Expense>>{};
-          for (final expense in expenses) {
-            final date = expense.expenseDate.split('T').first;
-            grouped.putIfAbsent(date, () => []).add(expense);
-          }
+              // Group by date
+              final grouped = <String, List<Expense>>{};
+              for (final expense in expenses) {
+                final date = expense.expenseDate.split('T').first;
+                grouped.putIfAbsent(date, () => []).add(expense);
+              }
 
-          final total = expenses.fold(0.0, (sum, e) => sum + e.amount);
+              final total = expenses.fold(0.0, (sum, e) => sum + e.amount);
 
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'Total: ${formatCurrency(total)}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'Total: ${formatCurrency(total)}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: grouped.length,
-                  itemBuilder: (context, index) {
-                    final date = grouped.keys.elementAt(index);
-                    final dayExpenses = grouped[date]!;
-                    final dayTotal = dayExpenses.fold(
-                      0.0,
-                      (sum, e) => sum + e.amount,
-                    );
-                    return ExpansionTile(
-                      title: Text('$date - ${formatCurrency(dayTotal)}'),
-                      children: dayExpenses
-                          .map((expense) => _buildExpenseTile(expense))
-                          .toList(),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-      error: (error, stack) => Center(child: Text('Error: $error')),
-      loading: () => const Center(child: CircularProgressIndicator()),
-    );
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: grouped.length,
+                      itemBuilder: (context, index) {
+                        final date = grouped.keys.elementAt(index);
+                        final dayExpenses = grouped[date]!;
+                        final dayTotal = dayExpenses.fold(
+                          0.0,
+                          (sum, e) => sum + e.amount,
+                        );
+                        return ExpansionTile(
+                          title: Text('$date - ${formatCurrency(dayTotal)}'),
+                          children: dayExpenses
+                              .map((expense) => _buildExpenseTile(expense))
+                              .toList(),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          error: (error, stack) => Center(child: Text('Error: $error')),
+          loading: () => const Center(child: CircularProgressIndicator()),
+        );
   }
 
   Widget _buildExpenseTile(Expense expense) {
@@ -179,7 +188,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
         final accountName = snapshot.data?.accountNameGujarati ?? 'Unknown';
         return ListTile(
           title: Text(accountName),
-          subtitle: expense.description != null ? Text(expense.description!) : null,
+          subtitle: expense.description != null
+              ? Text(expense.description!)
+              : null,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -208,9 +219,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
 
   void _editExpense(Expense expense) {
     // TODO: Implement edit
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Edit not implemented yet')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Edit not implemented yet')));
   }
 
   void _deleteExpense(Expense expense) async {
@@ -235,15 +246,18 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     if (confirm == true) {
       final repo = await ref.read(expenseRepositoryProvider.future);
       await repo.deleteExpense(expense.id!);
+      if (!mounted) return;
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Expense deleted')));
     }
   }
 }
 
-final expenseRepositoryProvider = FutureProvider<ExpenseRepository>((ref) async {
+final expenseRepositoryProvider = FutureProvider<ExpenseRepository>((
+  ref,
+) async {
   final db = await ref.watch(databaseProvider.future);
   return ExpenseRepository(db);
 });

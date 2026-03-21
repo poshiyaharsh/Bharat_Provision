@@ -131,7 +131,9 @@ class _PLReportScreenState extends ConsumerState<PLReportScreen> {
   Widget _buildSummary(int startEpoch, int endEpoch) {
     final repoFuture = ref.watch(reportRepositoryProvider.future);
     return FutureBuilder<PLSummary>(
-      future: repoFuture.then((repo) => repo.getPLSummary(startEpoch, endEpoch)),
+      future: repoFuture.then(
+        (repo) => repo.getPLSummary(startEpoch, endEpoch),
+      ),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const CircularProgressIndicator();
         final summary = snapshot.data!;
@@ -180,7 +182,7 @@ class _PLReportScreenState extends ConsumerState<PLReportScreen> {
 
   Widget _buildSummaryCard(String title, double amount, Color color) {
     return Card(
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -204,7 +206,9 @@ class _PLReportScreenState extends ConsumerState<PLReportScreen> {
   Widget _buildSalesBreakdown(int startEpoch, int endEpoch) {
     final repoFuture = ref.watch(reportRepositoryProvider.future);
     return FutureBuilder<PLSummary>(
-      future: repoFuture.then((repo) => repo.getPLSummary(startEpoch, endEpoch)),
+      future: repoFuture.then(
+        (repo) => repo.getPLSummary(startEpoch, endEpoch),
+      ),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final summary = snapshot.data!;
@@ -241,7 +245,9 @@ class _PLReportScreenState extends ConsumerState<PLReportScreen> {
   Widget _buildExpensesBreakdown(int startEpoch, int endEpoch) {
     final repoFuture = ref.watch(reportRepositoryProvider.future);
     return FutureBuilder<PLSummary>(
-      future: repoFuture.then((repo) => repo.getPLSummary(startEpoch, endEpoch)),
+      future: repoFuture.then(
+        (repo) => repo.getPLSummary(startEpoch, endEpoch),
+      ),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final summary = snapshot.data!;

@@ -16,6 +16,7 @@ class ReminderBottomSheet extends ConsumerStatefulWidget {
     this.initialTab,
   });
   final Customer customer;
+
   /// 'whatsapp' | 'sms' | null — which tab to open by default
   final String? initialTab;
 
@@ -24,8 +25,7 @@ class ReminderBottomSheet extends ConsumerStatefulWidget {
       _ReminderBottomSheetState();
 }
 
-class _ReminderBottomSheetState
-    extends ConsumerState<ReminderBottomSheet> {
+class _ReminderBottomSheetState extends ConsumerState<ReminderBottomSheet> {
   late final TextEditingController _messageCtrl;
   bool _sending = false;
   String _activeType = 'whatsapp'; // default; overridden in build
@@ -68,8 +68,9 @@ class _ReminderBottomSheetState
 
     if (phone.isEmpty && reminderType != 'pdf') {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('ગ્રાહકનો ફોન નંબર ઉમેરો')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ગ્રાહકનો ફોન નંબર ઉમેરો')),
+        );
       }
       return;
     }
@@ -100,24 +101,33 @@ class _ReminderBottomSheetState
         // Log the reminder
         await ref
             .read(udhaarRepositoryProvider)
-            .logReminder(widget.customer.id!, reminderType,
-                widget.customer.totalOutstanding);
+            .logReminder(
+              widget.customer.id!,
+              reminderType,
+              widget.customer.totalOutstanding,
+            );
 
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(reminderType == 'whatsapp'
-              ? 'WhatsApp ખોલ્યું'
-              : 'SMS ખોલ્યું'),
-          backgroundColor: AppColors.success,
-        ));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              reminderType == 'whatsapp' ? 'WhatsApp ખોલ્યું' : 'SMS ખોલ્યું',
+            ),
+            backgroundColor: AppColors.success,
+          ),
+        );
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('WhatsApp / SMS ઉઘ્ડ્યું નહીં')));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('WhatsApp / SMS ઉઘ્ડ્યું નહીં')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('ભૂલ: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('ભૂલ: $e')));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -130,8 +140,9 @@ class _ReminderBottomSheetState
 
     return settingsAsync.when(
       data: (settings) {
-        final shopName =
-            settings['shop_name']?.isEmpty ?? true ? 'દુકાન' : settings['shop_name']!;
+        final shopName = settings['shop_name']?.isEmpty ?? true
+            ? 'દુકાન'
+            : settings['shop_name']!;
         final whatsappEnabled = settings['reminder_whatsapp'] == 'true';
         final smsEnabled = settings['reminder_sms'] == 'true';
         final hasAnyEnabled = whatsappEnabled || smsEnabled;
@@ -139,7 +150,9 @@ class _ReminderBottomSheetState
         // Default active type to first enabled
         if (whatsappEnabled && _activeType == 'whatsapp') {
           // already default
-        } else if (!whatsappEnabled && smsEnabled && _activeType == 'whatsapp') {
+        } else if (!whatsappEnabled &&
+            smsEnabled &&
+            _activeType == 'whatsapp') {
           _activeType = 'sms';
         }
 
@@ -180,15 +193,15 @@ class _ReminderBottomSheetState
                 // Header
                 Row(
                   children: [
-                    const Icon(Icons.notifications_active,
-                        color: AppColors.warning),
+                    const Icon(
+                      Icons.notifications_active,
+                      color: AppColors.warning,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '${widget.customer.nameGujarati} — ${formatCurrency(widget.customer.totalOutstanding)}',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -221,14 +234,16 @@ class _ReminderBottomSheetState
                           selected: _activeType == 'whatsapp',
                           selectedColor: const Color(0xFF25D366),
                           labelStyle: TextStyle(
-                              color: _activeType == 'whatsapp'
-                                  ? Colors.white
-                                  : null),
+                            color: _activeType == 'whatsapp'
+                                ? Colors.white
+                                : null,
+                          ),
                           onSelected: (_) {
                             setState(() {
                               _activeType = 'whatsapp';
-                              _messageCtrl.text =
-                                  _buildWhatsAppMessage(shopName);
+                              _messageCtrl.text = _buildWhatsAppMessage(
+                                shopName,
+                              );
                             });
                           },
                         ),
@@ -245,13 +260,12 @@ class _ReminderBottomSheetState
                           selected: _activeType == 'sms',
                           selectedColor: AppColors.primary,
                           labelStyle: TextStyle(
-                              color:
-                                  _activeType == 'sms' ? Colors.white : null),
+                            color: _activeType == 'sms' ? Colors.white : null,
+                          ),
                           onSelected: (_) {
                             setState(() {
                               _activeType = 'sms';
-                              _messageCtrl.text =
-                                  _buildSmsMessage(shopName);
+                              _messageCtrl.text = _buildSmsMessage(shopName);
                             });
                           },
                         ),
@@ -259,8 +273,7 @@ class _ReminderBottomSheetState
                   ),
                   const SizedBox(height: 12),
                   // Message preview / edit
-                  Text('સંદેશ',
-                      style: Theme.of(context).textTheme.bodyMedium),
+                  Text('સંદેશ', style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _messageCtrl
@@ -278,24 +291,22 @@ class _ReminderBottomSheetState
                   ElevatedButton.icon(
                     onPressed: _sending
                         ? null
-                        : () => _send(_activeType,
-                            _messageCtrl.text, settings),
+                        : () => _send(_activeType, _messageCtrl.text, settings),
                     icon: _sending
                         ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white))
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : Icon(
-                            _activeType == 'whatsapp'
-                                ? Icons.chat
-                                : Icons.sms,
-                            color: Colors.white),
+                            _activeType == 'whatsapp' ? Icons.chat : Icons.sms,
+                            color: Colors.white,
+                          ),
                     label: Text(
-                      _activeType == 'whatsapp'
-                          ? 'WhatsApp ખોલો'
-                          : 'SMS ખોલો',
+                      _activeType == 'whatsapp' ? 'WhatsApp ખોલો' : 'SMS ખોલો',
                       style: const TextStyle(color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
@@ -316,10 +327,8 @@ class _ReminderBottomSheetState
         padding: EdgeInsets.all(40),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text('ભૂલ: $e'),
-      ),
+      error: (e, _) =>
+          Padding(padding: const EdgeInsets.all(20), child: Text('ભૂલ: $e')),
     );
   }
 }

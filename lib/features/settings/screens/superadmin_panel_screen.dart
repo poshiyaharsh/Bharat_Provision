@@ -41,6 +41,7 @@ class _SuperadminPanelScreenState extends ConsumerState<SuperadminPanelScreen>
       ),
     );
 
+    if (!mounted) return;
     if (verified ?? false) {
       setState(() {
         _isPinVerified = true;

@@ -92,8 +92,8 @@ class _PinNumpadState extends ConsumerState<PinNumpad>
     }
   }
 
-  void _handleKeyEvent(RawKeyEvent event) {
-    if (event is RawKeyDownEvent) {
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is KeyDownEvent) {
       final key = event.logicalKey;
       if (key == LogicalKeyboardKey.backspace) {
         _removeDigit();
@@ -127,9 +127,9 @@ class _PinNumpadState extends ConsumerState<PinNumpad>
     final role = widget.role ?? ref.watch(currentRoleProvider);
     final buttonColor = RoleThemeColors.colorForRole(role ?? 'employee');
 
-    return RawKeyboardListener(
+    return KeyboardListener(
       focusNode: _focusNode,
-      onKey: _handleKeyEvent,
+      onKeyEvent: _handleKeyEvent,
       child: AnimatedBuilder(
         animation: _shakeController,
         builder: (context, child) {

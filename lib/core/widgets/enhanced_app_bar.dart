@@ -92,7 +92,7 @@ class EnhancedAppBar extends ConsumerWidget implements PreferredSizeWidget {
                   ),
                 ],
                 icon: CircleAvatar(
-                  backgroundColor: Colors.white.withOpacity(0.3),
+                  backgroundColor: Colors.white.withValues(alpha: 0.3),
                   child: Icon(
                     RoleThemeColors.iconForRole(role),
                     color: Colors.white,
@@ -113,7 +113,11 @@ class LogoutButton extends ConsumerWidget {
   final VoidCallback? onLogout;
   final String label;
 
-  const LogoutButton({this.onLogout, this.label = AppStrings.logout, super.key});
+  const LogoutButton({
+    this.onLogout,
+    this.label = AppStrings.logout,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
