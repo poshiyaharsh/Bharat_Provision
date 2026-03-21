@@ -351,14 +351,14 @@ class ReportRepository {
   Future<DailyReportData> getDailyReport(DateTime date) async {
     final start = DateTime(date.year, date.month, date.day);
     final end = start.add(const Duration(days: 1));
-    final startIso = start.toIso8601String();
-    final endIso = end.toIso8601String();
+    final startEpoch = start.millisecondsSinceEpoch;
+    final endEpoch = end.millisecondsSinceEpoch;
 
     // Bills
     final billsResult = await _db.query(
       'bills',
       where: 'date_time >= ? AND date_time < ?',
-      whereArgs: [startIso, endIso],
+      whereArgs: [startEpoch, endEpoch],
       orderBy: 'date_time DESC',
     );
     final bills = billsResult.map((row) => Bill.fromMap(row)).toList();
@@ -381,28 +381,36 @@ class ReportRepository {
         .fold(0.0, (sum, b) => sum + b.totalAmount);
 
     // Udhaar collected
-    final udhaarResult = await _db.rawQuery(
-      '''
-      SELECT COALESCE(SUM(amount), 0) as collected
-      FROM udhaar_payments
-      WHERE date >= ? AND date < ?
-      ''',
-      [startIso, endIso],
-    );
-    final udhaarCollected =
-        (udhaarResult.first['collected'] as num?)?.toDouble() ?? 0;
+    double udhaarCollected = 0;
+    final hasUdhaarPayments = await _tableExists('udhaar_payments');
+    if (hasUdhaarPayments) {
+      final udhaarResult = await _db.rawQuery(
+        '''
+        SELECT COALESCE(SUM(amount), 0) as collected
+        FROM udhaar_payments
+        WHERE date_time >= ? AND date_time < ?
+        ''',
+        [startEpoch, endEpoch],
+      );
+      udhaarCollected =
+          (udhaarResult.first['collected'] as num?)?.toDouble() ?? 0;
+    }
 
     // Expenses by category
-    final expensesResult = await _db.rawQuery(
-      '''
-      SELECT ea.name, SUM(e.amount) as amount
-      FROM expenses e
-      JOIN expense_accounts ea ON e.expense_account_id = ea.id
-      WHERE e.date >= ? AND e.date < ?
-      GROUP BY ea.name
-      ''',
-      [startIso, endIso],
-    );
+    final hasExpenses = await _tableExists('expenses');
+    final hasExpenseAccounts = await _tableExists('expense_accounts');
+    final expensesResult = (hasExpenses && hasExpenseAccounts)
+        ? await _db.rawQuery(
+            '''
+            SELECT ea.name, SUM(e.amount) as amount
+            FROM expenses e
+            JOIN expense_accounts ea ON e.expense_account_id = ea.id
+            WHERE e.date_time >= ? AND e.date_time < ?
+            GROUP BY ea.name
+            ''',
+            [startEpoch, endEpoch],
+          )
+        : <Map<String, Object?>>[];
     final expensesByCategory = <String, double>{};
     for (final row in expensesResult) {
       expensesByCategory[row['name'] as String] =
@@ -424,6 +432,14 @@ class ReportRepository {
       netPL: netPL,
       bills: bills,
     );
+  }
+
+  Future<bool> _tableExists(String tableName) async {
+    final result = await _db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [tableName],
+    );
+    return result.isNotEmpty;
   }
 }
 

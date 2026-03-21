@@ -12,9 +12,12 @@ import '../../data/models/item.dart';
 import '../../routing/app_router.dart';
 import 'billing_providers.dart';
 import '../../core/services/notification_service.dart';
+import '../../features/inventory/inventory_providers.dart';
 import '../../features/stock/stock_providers.dart';
 import '../../features/settings/settings_providers.dart';
 import '../../data/providers.dart';
+import '../../data/repositories/bill_repository.dart';
+import '../../features/reports/reports_providers.dart';
 
 /// Simplified single-screen billing - Create bills and print them.
 class BillingHomeScreen extends ConsumerStatefulWidget {
@@ -31,6 +34,10 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   String? _bannerMessage;
   String? _customerName;
   String? _shopName;
+  String? _shopAddress;
+  String? _shopPhone;
+  String? _shopGstin;
+  bool _lowStockPopupShown = false;
 
   @override
   void initState() {
@@ -39,15 +46,22 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(billingSearchProvider.notifier).state = '';
       ref.invalidate(billingItemsProvider);
+      _loadShopProfileFromSettings();
+    });
+  }
 
-      // Load shop name from settings automatically
-      ref.read(shopNameProvider).whenData((shopName) {
-        if (shopName.isNotEmpty && mounted) {
-          setState(() {
-            _shopName = shopName;
-          });
-        }
-      });
+  Future<void> _loadShopProfileFromSettings() async {
+    final repo = await ref.read(settingsRepositoryFutureProvider.future);
+    final savedShopName = (await repo.get('shop_name')).trim();
+    final savedShopAddress = (await repo.get('shop_address')).trim();
+    final savedShopPhone = (await repo.get('shop_phone')).trim();
+    final savedShopGstin = (await repo.get('gstin')).trim();
+    if (!mounted) return;
+    setState(() {
+      _shopName = savedShopName.isEmpty ? null : savedShopName;
+      _shopAddress = savedShopAddress.isEmpty ? null : savedShopAddress;
+      _shopPhone = savedShopPhone.isEmpty ? null : savedShopPhone;
+      _shopGstin = savedShopGstin.isEmpty ? null : savedShopGstin;
     });
   }
 
@@ -125,6 +139,8 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                   settingsRepositoryFutureProvider.future,
                 );
                 await repo.set('shop_name', newShopName);
+                ref.invalidate(shopNameProvider);
+                ref.invalidate(settingsValuesProvider);
               }
 
               Navigator.of(ctx).pop();
@@ -195,6 +211,31 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
       );
       return;
     }
+
+    if (item.isLowStock) {
+      final shouldContinue = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('લો સ્ટોક ચેતવણી'),
+          content: Text(
+            '${item.nameGu} નો સ્ટોક ઓછો છે.\nહાલ સ્ટોક: ${item.currentStock.toStringAsFixed(2)} ${item.unit}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('રદ કરો'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('ઉમેરો'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinue != true) return;
+    }
+
     double amountPaid = item.salePrice;
     double weightGrams = 1000;
     String mode = 'amount';
@@ -413,12 +454,83 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
           content: Text('બિલ તૈયાર! (Bluetooth print pending integration)'),
         ),
       );
+      // Automatically save bill after printing
+      await _saveBillAfterPrint();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('ભૂલ: $e')));
     }
+  }
+
+  Future<void> _saveBillAfterPrint() async {
+    try {
+      // Convert bill line items to BillItemInput format
+      final billItems = _billLines.map((line) {
+        final quantityInStockUnit = _toStockUnitQuantity(line);
+        final double unitPrice = quantityInStockUnit > 0
+            ? line.amount / quantityInStockUnit
+            : 0.0;
+        return BillItemInput(
+          itemId: line.item.id ?? 0,
+          quantity: quantityInStockUnit,
+          unitPrice: unitPrice,
+        );
+      }).toList();
+
+      // Save bill to database
+      final billRepo = await ref.read(billRepositoryFutureProvider.future);
+      final billId = await billRepo.createBill(
+        customerId: null,
+        items: billItems,
+        discountAmount: _discount,
+        paidAmount: _total,
+        paymentMode: 'cash',
+        userId: null,
+      );
+
+      // Invalidate reports providers to refresh data
+      if (mounted) {
+        ref.invalidate(reportRepositoryFutureProvider);
+        ref.invalidate(salesReportProvider);
+        ref.invalidate(billingItemsProvider);
+        ref.invalidate(itemListProvider);
+      }
+
+      // Clear bill after successful save
+      setState(() {
+        _billLines.clear();
+        _discount = 0;
+        _customerName = null;
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'બિલ #$billId સફળતાથી બચાવવામાં આવ્યો! રિપોર્ટમાં અપડેટ થયો.',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('બિલ બચાવવામાં ભૂલ: $e')));
+    }
+  }
+
+  double _toStockUnitQuantity(BillLineItem line) {
+    final unit = line.item.unit.trim().toLowerCase();
+    if (unit.contains('કિલો') || unit == 'kg' || unit.contains('kilo')) {
+      return line.qtyGrams / 1000.0;
+    }
+    if (unit.contains('ગ્રામ') || unit == 'g' || unit.contains('gram')) {
+      return line.qtyGrams;
+    }
+    return line.qtyGrams;
   }
 
   String _generateBillText() {
@@ -431,6 +543,20 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
       buffer.writeln('===============================');
       buffer.writeln('            બિલ');
       buffer.writeln('===============================');
+    }
+    if (_shopAddress != null && _shopAddress!.isNotEmpty) {
+      buffer.writeln('સરનામું: $_shopAddress');
+    }
+    if (_shopPhone != null && _shopPhone!.isNotEmpty) {
+      buffer.writeln('ફોન: $_shopPhone');
+    }
+    if (_shopGstin != null && _shopGstin!.isNotEmpty) {
+      buffer.writeln('GSTIN: $_shopGstin');
+    }
+    if ((_shopAddress != null && _shopAddress!.isNotEmpty) ||
+        (_shopPhone != null && _shopPhone!.isNotEmpty) ||
+        (_shopGstin != null && _shopGstin!.isNotEmpty)) {
+      buffer.writeln('-------------------------------');
     }
     if (_customerName != null && _customerName!.isNotEmpty) {
       buffer.writeln('ગ્રાહક: $_customerName');
@@ -607,10 +733,69 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                 itemCount: items.length,
                 itemBuilder: (ctx, i) {
                   final item = items[i];
+                  if (!_lowStockPopupShown) {
+                    final lowStockItems = items
+                        .where((p) => p.currentStock > 0 && p.isLowStock)
+                        .toList();
+                    if (lowStockItems.isNotEmpty) {
+                      _lowStockPopupShown = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        showDialog<void>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('લો સ્ટોક એલર્ટ'),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: lowStockItems
+                                    .take(6)
+                                    .map(
+                                      (p) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 6,
+                                        ),
+                                        child: Text(
+                                          '• ${p.nameGu}: ${p.currentStock.toStringAsFixed(2)} ${p.unit}',
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: const Text('બરાબર'),
+                              ),
+                            ],
+                          ),
+                        );
+                      });
+                    }
+                  }
                   return ListTile(
                     leading: const Icon(Icons.inventory_2),
                     title: Text(item.nameGu),
-                    subtitle: Text('₹${item.salePrice.toStringAsFixed(2)}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('₹${item.salePrice.toStringAsFixed(2)}'),
+                        Text(
+                          'સ્ટોક: ${item.currentStock.toStringAsFixed(2)} ${item.unit}',
+                          style: TextStyle(
+                            color: item.isLowStock ? Colors.red : Colors.grey,
+                            fontWeight: item.isLowStock
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: item.isLowStock
+                        ? const Icon(Icons.warning_amber, color: Colors.red)
+                        : null,
                     onTap: () => _addProductToBill(item),
                   );
                 },

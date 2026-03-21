@@ -5,6 +5,7 @@ import '../../core/localization/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/currency_format.dart';
 import '../../data/providers.dart';
+import '../../routing/app_router.dart';
 import 'reports_providers.dart';
 
 class ReportsHomeScreen extends ConsumerWidget {
@@ -13,10 +14,18 @@ class ReportsHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+    final todayStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).millisecondsSinceEpoch;
     final todayEnd = now.millisecondsSinceEpoch;
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final weekStartEpoch = DateTime(weekStart.year, weekStart.month, weekStart.day).millisecondsSinceEpoch;
+    final weekStartEpoch = DateTime(
+      weekStart.year,
+      weekStart.month,
+      weekStart.day,
+    ).millisecondsSinceEpoch;
     final monthStart = DateTime(now.year, now.month, 1).millisecondsSinceEpoch;
 
     return Scaffold(
@@ -53,64 +62,68 @@ class ReportsHomeScreen extends ConsumerWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            ref.watch(outstandingKhataProvider).when(
-              data: (customers) {
-                if (customers.isEmpty) {
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text('કોઈ બાકી ખાતા નથી'),
-                    ),
-                  );
-                }
-                return Card(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: customers.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (ctx, i) {
-                      final c = customers[i];
-                      return ListTile(
-                        title: Text(c.name),
-                        trailing: Text(
-                          formatCurrency(c.balance),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.alert,
-                          ),
+            ref
+                .watch(outstandingKhataProvider)
+                .when(
+                  data: (customers) {
+                    if (customers.isEmpty) {
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text('કોઈ બાકી ખાતા નથી'),
                         ),
                       );
-                    },
+                    }
+                    return Card(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: customers.length,
+                        separatorBuilder: (_, _) => const Divider(height: 1),
+                        itemBuilder: (ctx, i) {
+                          final c = customers[i];
+                          return ListTile(
+                            title: Text(c.name),
+                            trailing: Text(
+                              formatCurrency(c.balance),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.alert,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  loading: () => const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
                   ),
-                );
-              },
-              loading: () => const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
+                  error: (e, _) => Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('${AppStrings.errorGeneric} $e'),
+                    ),
+                  ),
                 ),
-              ),
-              error: (e, _) => Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('${AppStrings.errorGeneric} $e'),
-                ),
-              ),
-            ),
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pushNamed('/plReport'),
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed(AppRouter.plReport),
                     child: const Text('P&L Report'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pushNamed('/dailyReport'),
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed(AppRouter.dailyReport),
                     child: const Text('Daily Report'),
                   ),
                 ),
@@ -137,9 +150,9 @@ class _SalesCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FutureBuilder(
-      future: ref.read(reportRepositoryFutureProvider.future).then(
-            (repo) => repo.getSalesSummary(startEpoch, endEpoch),
-          ),
+      future: ref
+          .read(reportRepositoryFutureProvider.future)
+          .then((repo) => repo.getSalesSummary(startEpoch, endEpoch)),
       builder: (ctx, snap) {
         final summary = snap.data;
         return Card(
@@ -148,10 +161,7 @@ class _SalesCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 if (summary != null)
                   Column(

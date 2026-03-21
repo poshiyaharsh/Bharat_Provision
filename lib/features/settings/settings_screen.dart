@@ -58,11 +58,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _saveProfile() async {
     final repo = await ref.read(settingsRepositoryFutureProvider.future);
-    await repo.set('shop_name', _shopNameController.text);
-    await repo.set('shop_address', _addressController.text);
-    await repo.set('shop_phone', _phoneController.text);
-    await repo.set('gstin', _gstinController.text);
-    await repo.set('bill_footer', _billFooterController.text);
+    await repo.set('shop_name', _shopNameController.text.trim());
+    await repo.set('shop_address', _addressController.text.trim());
+    await repo.set('shop_phone', _phoneController.text.trim());
+    await repo.set('gstin', _gstinController.text.trim());
+    await repo.set('bill_footer', _billFooterController.text.trim());
+    ref.invalidate(shopNameProvider);
+    ref.invalidate(settingsValuesProvider);
     if (mounted) {
       ScaffoldMessenger.of(
         context,
