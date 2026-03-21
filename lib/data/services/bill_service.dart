@@ -1,4 +1,4 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' hide DatabaseException;
 import '../models/bill.dart';
 import '../models/bill_item.dart';
 import '../../core/database/transaction_helper.dart';
@@ -101,7 +101,6 @@ class BillService {
       }
       throw BillException(
         message: 'બીલ સેવ કરી શકાયું નથી: ${e.toString()}',
-        originalError: e,
       );
     }
   }
@@ -288,5 +287,5 @@ class BillWithItems {
   BillWithItems({required this.bill, required this.items});
 
   double get subtotal => items.fold(0, (sum, item) => sum + item.lineTotal);
-  double get total => subtotal - (bill.discountAmount ?? 0);
+  double get total => subtotal - bill.discountAmount;
 }

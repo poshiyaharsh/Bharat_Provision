@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 /// Lightweight snackbars used for minor errors, warnings, and info messages.
 class ErrorDialogue {
-  static const _defaultDuration = Duration(seconds: 4);
-
   /// Show a snackbar styled for errors/warnings/info.
   static void showSnackbar(
     BuildContext context, {
@@ -55,7 +53,6 @@ class ErrorDialogue {
       case ErrorDialogueType.success:
         return Colors.green[700]!;
       case ErrorDialogueType.error:
-      default:
         return Colors.red[700]!;
     }
   }

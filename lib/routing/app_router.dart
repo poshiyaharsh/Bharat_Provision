@@ -189,12 +189,6 @@ class AppRouter {
           const DailyReportScreen(),
           allowedRoles: const ['admin', 'superadmin'],
         );
-      case khata:
-        return _buildShellGuarded(
-          2,
-          const KhataScreen(),
-          allowedRoles: const ['admin', 'superadmin'],
-        );
       case addExpense:
         return _buildGuarded(
           const AddExpenseScreen(),

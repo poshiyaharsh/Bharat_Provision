@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/localization/app_strings.dart';
-import '../../core/widgets/numpad.dart';
 import '../../core/widgets/primary_button.dart';
 import '../../data/models/item.dart';
 import '../../data/providers.dart';
@@ -146,43 +145,6 @@ class _ItemEditScreenState extends ConsumerState<ItemEditScreen> {
         );
       }
     }
-  }
-
-  void _showNumpad(TextEditingController ctrl, String label) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(ctx).width,
-              maxHeight: MediaQuery.sizeOf(ctx).height * 0.6,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(label, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  NumpadTextField(
-                    controller: ctrl,
-                    allowDecimal: true,
-                    decoration: const InputDecoration(),
-                  ),
-                  const SizedBox(height: 16),
-                  NumpadWidget(
-                    controller: ctrl,
-                    allowDecimal: true,
-                    onSubmit: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override

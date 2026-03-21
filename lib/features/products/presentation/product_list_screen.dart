@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_strings.dart' as strings;
 import '../../../core/errors/error_handler.dart';
+import '../../../core/errors/error_types.dart';
 import '../../../shared/models/product_model.dart';
 import '../../../shared/providers/product_provider.dart';
 import '../../../shared/widgets/errors/error_dialogue.dart';

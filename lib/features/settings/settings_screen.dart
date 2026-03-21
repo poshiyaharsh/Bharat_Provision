@@ -36,11 +36,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final repo = await ref.read(settingsRepositoryFutureProvider.future);
-    _shopNameController.text = await repo.get('shop_name') ?? '';
-    _addressController.text = await repo.get('shop_address') ?? '';
-    _phoneController.text = await repo.get('shop_phone') ?? '';
-    _gstinController.text = await repo.get('gstin') ?? '';
-    _billFooterController.text = await repo.get('bill_footer') ?? '';
+    _shopNameController.text = await repo.get('shop_name');
+    _addressController.text = await repo.get('shop_address');
+    _phoneController.text = await repo.get('shop_phone');
+    _gstinController.text = await repo.get('gstin');
+    _billFooterController.text = await repo.get('bill_footer');
     final largeText = await repo.getBool('large_text');
     ref.read(largeTextProvider.notifier).state = largeText;
     if (mounted) setState(() {});

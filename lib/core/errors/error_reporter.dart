@@ -1,9 +1,7 @@
-import 'dart:io';
-
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../data/repositories/settings_repository.dart';
+import '../../data/repositories/settings_repository.dart';
 import 'error_logger.dart';
 
 /// Provides actions that help the user / superadmin send error logs to the developer.
