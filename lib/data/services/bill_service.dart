@@ -99,9 +99,7 @@ class BillService {
       if (e is BillException) {
         rethrow;
       }
-      throw BillException(
-        message: 'બીલ સેવ કરી શકાયું નથી: ${e.toString()}',
-      );
+      throw BillException(message: 'બીલ સેવ કરી શકાયું નથી: ${e.toString()}');
     }
   }
 

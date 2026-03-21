@@ -64,9 +64,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await repo.set('gstin', _gstinController.text);
     await repo.set('bill_footer', _billFooterController.text);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('સેટિંગ્સ સેવ થયું')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('સેટિંગ્સ સેવ થયું')));
     }
   }
 
@@ -76,10 +76,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       String path;
       if (Platform.isAndroid || Platform.isIOS) {
         final dir = await getApplicationDocumentsDirectory();
-        path = '${dir.path}/kirana_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+        path =
+            '${dir.path}/kirana_backup_${DateTime.now().millisecondsSinceEpoch}.json';
       } else {
         final dir = await getApplicationSupportDirectory();
-        path = '${dir.path}/kirana_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+        path =
+            '${dir.path}/kirana_backup_${DateTime.now().millisecondsSinceEpoch}.json';
       }
       final file = File(path);
       await file.writeAsString(json);
@@ -125,9 +127,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ref.invalidate(customerListProvider);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(AppStrings.importSuccess)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text(AppStrings.importSuccess)));
       }
     } catch (e) {
       if (mounted) {
@@ -165,13 +167,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 8),
             TextField(
               controller: _addressController,
-              decoration: const InputDecoration(labelText: AppStrings.shopAddress),
+              decoration: const InputDecoration(
+                labelText: AppStrings.shopAddress,
+              ),
               maxLines: 2,
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _phoneController,
-              decoration: const InputDecoration(labelText: AppStrings.shopPhone),
+              decoration: const InputDecoration(
+                labelText: AppStrings.shopPhone,
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -181,7 +187,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const SizedBox(height: 8),
             TextField(
               controller: _billFooterController,
-              decoration: const InputDecoration(labelText: AppStrings.billFooter),
+              decoration: const InputDecoration(
+                labelText: AppStrings.billFooter,
+              ),
               maxLines: 2,
             ),
             const SizedBox(height: 16),
@@ -200,7 +208,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               value: largeText,
               onChanged: (v) async {
                 ref.read(largeTextProvider.notifier).state = v;
-                final repo = await ref.read(settingsRepositoryFutureProvider.future);
+                final repo = await ref.read(
+                  settingsRepositoryFutureProvider.future,
+                );
                 await repo.setBool('large_text', v);
               },
             ),
