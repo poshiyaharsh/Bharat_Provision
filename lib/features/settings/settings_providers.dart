@@ -4,6 +4,12 @@ import '../../data/providers.dart';
 
 final largeTextProvider = StateProvider<bool>((ref) => false);
 
+// Shop name provider - auto-fetches from settings
+final shopNameProvider = FutureProvider<String>((ref) async {
+  final repo = await ref.watch(settingsRepositoryFutureProvider.future);
+  return await repo.get('shop_name');
+});
+
 final settingsValuesProvider = FutureProvider<Map<String, String>>((ref) async {
   final repo = await ref.watch(settingsRepositoryFutureProvider.future);
   return {

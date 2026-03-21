@@ -7,6 +7,7 @@ import '../settings_providers.dart';
 import 'superadmin_panel_screen.dart';
 import 'expense_accounts_manager_screen.dart';
 import 'transliteration_dictionary_screen.dart';
+import '../../../data/providers.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -109,29 +110,65 @@ class _ShopInfoTab extends ConsumerWidget {
                 _TextSettingField(
                   label: 'Shop Name',
                   value: data['shop_name']!,
-                  onSave: (value) {
-                    // TODO: Save to repository
+                  onSave: (value) async {
+                    final repo = await ref.read(
+                      settingsRepositoryFutureProvider.future,
+                    );
+                    await repo.set('shop_name', value);
+                    ref.invalidate(settingsValuesProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Shop Name Saved')),
+                      );
+                    }
                   },
                 ),
                 _TextSettingField(
                   label: 'Address',
                   value: data['shop_address']!,
-                  onSave: (value) {
-                    // TODO: Save to repository
+                  onSave: (value) async {
+                    final repo = await ref.read(
+                      settingsRepositoryFutureProvider.future,
+                    );
+                    await repo.set('shop_address', value);
+                    ref.invalidate(settingsValuesProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Address Saved')),
+                      );
+                    }
                   },
                 ),
                 _TextSettingField(
                   label: 'Phone',
                   value: data['shop_phone']!,
-                  onSave: (value) {
-                    // TODO: Save to repository
+                  onSave: (value) async {
+                    final repo = await ref.read(
+                      settingsRepositoryFutureProvider.future,
+                    );
+                    await repo.set('shop_phone', value);
+                    ref.invalidate(settingsValuesProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Phone Saved')),
+                      );
+                    }
                   },
                 ),
                 _TextSettingField(
                   label: 'GST Number',
                   value: data['gstin']!,
-                  onSave: (value) {
-                    // TODO: Save to repository
+                  onSave: (value) async {
+                    final repo = await ref.read(
+                      settingsRepositoryFutureProvider.future,
+                    );
+                    await repo.set('gstin', value);
+                    ref.invalidate(settingsValuesProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('GST Number Saved')),
+                      );
+                    }
                   },
                 ),
               ],

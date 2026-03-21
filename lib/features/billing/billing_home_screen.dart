@@ -13,6 +13,8 @@ import '../../routing/app_router.dart';
 import 'billing_providers.dart';
 import '../../core/services/notification_service.dart';
 import '../../features/stock/stock_providers.dart';
+import '../../features/settings/settings_providers.dart';
+import '../../data/providers.dart';
 
 /// Simplified single-screen billing - Create bills and print them.
 class BillingHomeScreen extends ConsumerStatefulWidget {
@@ -28,6 +30,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   double _discount = 0;
   String? _bannerMessage;
   String? _customerName;
+  String? _shopName;
 
   @override
   void initState() {
@@ -36,6 +39,15 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(billingSearchProvider.notifier).state = '';
       ref.invalidate(billingItemsProvider);
+
+      // Load shop name from settings automatically
+      ref.read(shopNameProvider).whenData((shopName) {
+        if (shopName.isNotEmpty && mounted) {
+          setState(() {
+            _shopName = shopName;
+          });
+        }
+      });
     });
   }
 
@@ -66,7 +78,55 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              setState(() => _customerName = controller.text.trim().isEmpty ? null : controller.text.trim());
+              setState(
+                () => _customerName = controller.text.trim().isEmpty
+                    ? null
+                    : controller.text.trim(),
+              );
+              Navigator.of(ctx).pop();
+            },
+            child: const Text(strings.AppStrings.saveButton),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setShopName() async {
+    final controller = TextEditingController(text: _shopName ?? '');
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('દુકાનનું નામ દાખલ કરો'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'દુકાનનું નામ',
+            hintText: 'દુકાનનું નામ દાખલ કરો...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(strings.AppStrings.cancelButton),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newShopName = controller.text.trim().isEmpty
+                  ? null
+                  : controller.text.trim();
+
+              setState(() => _shopName = newShopName);
+
+              // Save to settings
+              if (newShopName != null) {
+                final repo = await ref.read(
+                  settingsRepositoryFutureProvider.future,
+                );
+                await repo.set('shop_name', newShopName);
+              }
+
               Navigator.of(ctx).pop();
             },
             child: const Text(strings.AppStrings.saveButton),
@@ -363,9 +423,15 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
 
   String _generateBillText() {
     StringBuffer buffer = StringBuffer();
-    buffer.writeln('===============================');
-    buffer.writeln('            બિલ');
-    buffer.writeln('===============================');
+    if (_shopName != null && _shopName!.isNotEmpty) {
+      buffer.writeln('===============================');
+      buffer.writeln(_shopName!.toUpperCase());
+      buffer.writeln('===============================');
+    } else {
+      buffer.writeln('===============================');
+      buffer.writeln('            બિલ');
+      buffer.writeln('===============================');
+    }
     if (_customerName != null && _customerName!.isNotEmpty) {
       buffer.writeln('ગ્રાહક: $_customerName');
       buffer.writeln('-------------------------------');
@@ -589,29 +655,69 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                 'હાલનો બિલ',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
-              GestureDetector(
-                onTap: _setCustomerName,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.person, size: 16),
-                      const SizedBox(width: 4),
-                      Text(
-                        _customerName ?? 'ગ્રાહક ઉમેરો',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _customerName != null ? Colors.black : Colors.grey,
-                        ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: _setShopName,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
                       ),
-                    ],
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.blue),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.store, size: 16, color: Colors.blue),
+                          const SizedBox(width: 4),
+                          Text(
+                            _shopName ?? 'દુકાન નામ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _shopName != null
+                                  ? Colors.black
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _setCustomerName,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.person, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            _customerName ?? 'ગ્રાહક ઉમેરો',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _customerName != null
+                                  ? Colors.black
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
