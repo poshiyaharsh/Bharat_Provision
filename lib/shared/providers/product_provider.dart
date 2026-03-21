@@ -20,12 +20,11 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
   Future<void> loadAllProducts() async {
     try {
       final db = await _dbHelper.database;
-      final rows =
-          await db.query(
-                'products',
-                where: 'is_active = 1',
-                orderBy: 'name_gujarati COLLATE NOCASE',
-              );
+      final rows = await db.query(
+        'products',
+        where: 'is_active = 1',
+        orderBy: 'name_gujarati COLLATE NOCASE',
+      );
       final products = rows
           .map<Product>((m) => Product.fromMap(m as Map<String, dynamic>))
           .toList();
@@ -143,9 +142,8 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
       final db = await _dbHelper.database;
       final like = '%$q%';
 
-      final rows =
-          await db.rawQuery(
-                '''
+      final rows = await db.rawQuery(
+        '''
         SELECT DISTINCT p.*
         FROM products p
         LEFT JOIN transliteration_dictionary t
@@ -159,8 +157,8 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
             t.phonetic_key LIKE ?
           )
       ''',
-                [like, like, like, like, like],
-              );
+        [like, like, like, like, like],
+      );
 
       final products = rows
           .map<Product>((m) => Product.fromMap(m as Map<String, dynamic>))
@@ -200,8 +198,7 @@ class ProductProvider extends StateNotifier<AsyncValue<List<Product>>> {
   Future<List<Product>> getLowStockProducts() async {
     try {
       final db = await _dbHelper.database;
-      final rows =
-          await db.rawQuery('''
+      final rows = await db.rawQuery('''
         SELECT * FROM products
         WHERE is_active = 1
           AND stock_qty <= min_stock_qty

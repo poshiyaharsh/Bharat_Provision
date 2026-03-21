@@ -27,6 +27,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   final List<BillLineItem> _billLines = [];
   double _discount = 0;
   String? _bannerMessage;
+  String? _customerName;
 
   @override
   void initState() {
@@ -42,6 +43,37 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _setCustomerName() async {
+    final controller = TextEditingController(text: _customerName ?? '');
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ગ્રાહક નું નામ દાખલ કરો'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'ગ્રાહક નું નામ',
+            hintText: 'નામ દાખલ કરો...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(strings.AppStrings.cancelButton),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() => _customerName = controller.text.trim().isEmpty ? null : controller.text.trim());
+              Navigator.of(ctx).pop();
+            },
+            child: const Text(strings.AppStrings.saveButton),
+          ),
+        ],
+      ),
+    );
   }
 
   double get _subtotal => _billLines.fold(0, (sum, line) => sum + line.amount);
@@ -333,7 +365,12 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
     StringBuffer buffer = StringBuffer();
     buffer.writeln('===============================');
     buffer.writeln('            બિલ');
-    buffer.writeln('===============================\n');
+    buffer.writeln('===============================');
+    if (_customerName != null && _customerName!.isNotEmpty) {
+      buffer.writeln('ગ્રાહક: $_customerName');
+      buffer.writeln('-------------------------------');
+    }
+    buffer.writeln('');
     for (var line in _billLines) {
       buffer.writeln(line.item.nameGu);
       buffer.writeln(
@@ -545,9 +582,38 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: const Text(
-            'હાલનો બિલ',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'હાલનો બિલ',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              GestureDetector(
+                onTap: _setCustomerName,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        _customerName ?? 'ગ્રાહક ઉમેરો',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _customerName != null ? Colors.black : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         const Divider(height: 1),
@@ -671,6 +737,7 @@ class _BillingHomeScreenState extends ConsumerState<BillingHomeScreen> {
                         setState(() {
                           _billLines.clear();
                           _discount = 0;
+                          _customerName = null;
                         });
                       },
               ),
